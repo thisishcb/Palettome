@@ -40,6 +40,7 @@ the rest of the package.
 | `as_cluster_data()`, `compute_centroids()` | Core |
 | `detect_families()`, `compute_family_dendrogram()`, `cut_families()`, `plot_dendrogram()` | Core |
 | `generate_palette()`, `set_manual_color()`, `reset_overrides()` | Core |
+| `cluster_colors()`, `family_colors()` | Core |
 | `color_distance()`, `simulate_cvd()` | Core |
 | `downsample_stratified()` | Core |
 | `plot_palette_static()`, `plot_swatches()` | Core (ggplot2 used opportunistically if installed; base-R fallback otherwise) |
@@ -70,6 +71,44 @@ To resume editing later, or hand off manual overrides:
 session2 <- generate_palette(fam$assignment, session = session, mode = "contrast")
 # clusters/families with manual_color == TRUE keep their color unchanged
 ```
+
+`session$clusters`/`session$families` are already plain data frames (see
+the JSON schema below), but for the common case of just needing the colors
+themselves -- to hand to `Seurat::DimPlot(cols = ...)`,
+`ggplot2::scale_color_manual(values = ...)`, etc. -- use:
+
+```r
+cluster_colors(session)                     # named vector: c(c1 = "#4E5716", c2 = "#899925", ...)
+cluster_colors(session, format = "data.frame") # data frame: cluster, color
+family_colors(session)                      # same, one row per family
+```
+
+## Working with a Seurat object
+
+`as_cluster_data()` has a `Seurat` method, so you don't need to hand-extract
+embeddings/metadata yourself:
+
+```r
+pdata <- as_cluster_data(
+  seurat_obj,
+  reduction = "umap",           # any reduction name (Seurat::Embeddings())
+  dims = 1:2,                   # or 1:3 for a 3D embedding
+  cluster_col = "seurat_clusters", # any column of seurat_obj[[]]
+  family_col = NULL             # optional: a metadata column with an explicit parent/family label
+)
+# from here on it's identical to the data-frame path:
+fam <- detect_families(pdata, k = 4)
+session <- generate_palette(fam$assignment, mode = "harmonious", seed = 1)
+
+# hand the result back to Seurat's own plotting:
+Seurat::DimPlot(seurat_obj, reduction = "umap", group.by = "seurat_clusters",
+                cols = cluster_colors(session))
+```
+
+This method requires the `Seurat` package (Suggests-only, checked with a
+friendly error if missing) but nothing else in the package does -- everything
+downstream of `as_cluster_data()` only ever sees the plain `palettome_data`
+structure either input path produces.
 
 ## Interactive UI
 

@@ -35,6 +35,11 @@ print(sess$families)
 plot_palette_static(pdata, sess) # ggplot2 object if installed -> auto-prints
 plot_swatches(sess) # base-graphics swatch/legend figure
 
+# ---- 3b. Pull colors out in whichever shape you actually need -------------
+print(cluster_colors(sess)) # named vector: c(c1 = "#...", c2 = "#...", ...)
+print(cluster_colors(sess, format = "data.frame")) # data frame: cluster, color
+print(family_colors(sess))
+
 # ---- 4. Try contrast mode + a colorblind preview ---------------------------
 sess_contrast <- generate_palette(fam$assignment, mode = "contrast", seed = 1)
 plot_palette_static(pdata, sess_contrast, cvd = "deutan")
