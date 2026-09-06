@@ -9,8 +9,10 @@
 #'
 #' @param session A `palettome_session` (from [generate_palette()]).
 #' @param format `"vector"` (default) for a named character vector keyed by
-#'   cluster id, or `"data.frame"` for a two-column `cluster`/`color` data
-#'   frame.
+#'   cluster id, or `"data.frame"` for a `cluster`/`color`/`family_id`/
+#'   `family_color` data frame (the family's own representative color
+#'   merged in alongside its id, so grouping/faceting/legend code doesn't
+#'   need a separate join against [family_colors()]).
 #' @return A named character vector, or a data frame, depending on `format`.
 #' @export
 #' @examples
@@ -24,7 +26,9 @@ cluster_colors <- function(session, format = c("vector", "data.frame")) {
   if (format == "vector") {
     stats::setNames(session$clusters$color, session$clusters$cluster)
   } else {
-    session$clusters[, c("cluster", "color")]
+    df <- session$clusters[, c("cluster", "color", "family_id")]
+    df$family_color <- family_colors(session)[df$family_id]
+    df
   }
 }
 

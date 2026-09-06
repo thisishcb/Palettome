@@ -10,8 +10,10 @@ family_colors(session, format = c("vector", "data.frame"))
 \item{session}{A \code{palettome_session} (from \code{\link[=generate_palette]{generate_palette()}}).}
 
 \item{format}{\code{"vector"} (default) for a named character vector keyed by
-cluster id, or \code{"data.frame"} for a two-column \code{cluster}/\code{color} data
-frame.}
+cluster id, or \code{"data.frame"} for a \code{cluster}/\code{color}/\code{family_id}/
+\code{family_color} data frame (the family's own representative color
+merged in alongside its id, so grouping/faceting/legend code doesn't
+need a separate join against \code{\link[=family_colors]{family_colors()}}).}
 }
 \value{
 A named character vector, or a data frame, depending on \code{format}.

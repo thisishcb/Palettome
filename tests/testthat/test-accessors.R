@@ -18,8 +18,14 @@ test_that("cluster_colors / family_colors can return a plain data frame instead"
 
   cc <- cluster_colors(sess, format = "data.frame")
   expect_s3_class(cc, "data.frame")
-  expect_named(cc, c("cluster", "color"))
+  expect_named(cc, c("cluster", "color", "family_id", "family_color"))
   expect_equal(cc$color, sess$clusters$color)
+  expect_equal(cc$family_id, sess$clusters$family_id)
+  # family_color for each cluster matches that family's own color
+  expect_equal(
+    cc$family_color,
+    sess$families$color[match(cc$family_id, sess$families$family_id)]
+  )
 
   fc <- family_colors(sess, format = "data.frame")
   expect_named(fc, c("family_id", "color"))
