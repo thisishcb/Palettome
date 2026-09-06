@@ -7,6 +7,8 @@ hard-dependent on Seurat.
 Clusters that belong to the same **family** (e.g. subtypes of T cells,
 subtypes of myeloid cells) can be colored either:
 
+LLM was used in this project to speed up the development.
+
 - **harmonious** — family members share a base hue and vary only in
   shade/tint/tone, while distinct families get maximally separated hues, or
 - **contrast** — every cluster gets a maximally distinguishable color, with
