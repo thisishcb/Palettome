@@ -62,5 +62,3 @@ export_palette_csv <- function(session, clusters_file, families_file = NULL) {
   }
   invisible(TRUE)
 }
-
-`%||%` <- function(x, y) if (is.null(x)) y else x

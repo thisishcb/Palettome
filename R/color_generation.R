@@ -49,153 +49,279 @@ simulate_cvd <- function(hex, type = c("deutan", "protan", "tritan"), severity =
   if (identical(cvd, "none") || is.null(cvd)) hex else simulate_cvd(hex, type = cvd)
 }
 
-# ---- family base hues -------------------------------------------------
+# ---- lightness / chroma range resolution -----------------------------
 
-#' Pick maximally-separated base hues for families
-#'
-#' Evenly spaces hues around the wheel with a seeded random starting offset,
-#' then (when `cvd != "none"`) checks the minimum pairwise perceptual
-#' distance *as it would appear under that color-vision deficiency* and
-#' retries a few alternate offsets if hues that look distinct to full-color
-#' vision would collapse together under simulation.
-#'
-#' @param n Number of families.
-#' @param seed Random seed controlling the starting hue offset.
-#' @param hue_range Two-element numeric range (degrees) to spread hues over;
-#'   defaults to the full wheel.
-#' @param lightness,chroma L/C used only to render a representative swatch
-#'   for the CVD-distance check; does not affect the returned hues.
-#' @param cvd `"none"` or a CVD type understood by [simulate_cvd()].
-#' @param min_dist Minimum acceptable pairwise CIEDE2000 distance between
-#'   representative swatches under simulation.
-#' @param max_tries Number of alternate offsets to try before giving up and
-#'   returning the best one found.
-#' @return Numeric vector of `n` hues in degrees `[0, 360)`.
-#' @keywords internal
-.pick_family_hues <- function(n, seed, hue_range = c(0, 360),
-                               lightness = 60, chroma = 55,
-                               cvd = "none", min_dist = 15, max_tries = 20) {
-  if (n <= 0) return(numeric(0))
-  if (n == 1) {
-    set.seed(seed)
-    return(stats::runif(1, hue_range[1], hue_range[2]))
+# Presets used when a range is "auto" and there are no manual colors to
+# take a cue from. Tuned to the reference look: contrast = vivid mid
+# lightness; harmonious "sweep" = wide monotone lightness, muted chroma;
+# harmonious "per_family" = moderate both.
+.auto_range_preset <- function(kind, mode, harmonious_style, n_items = 8) {
+  hard <- if (kind == "L") c(16, 94) else c(4, 96)
+  rng <- if (mode == "contrast") {
+    # widen the working volume as more distinct colors are needed
+    w <- min(1, max(0, (n_items - 6) / 30))
+    if (kind == "L") c(50 - 12 * w, 76 + 6 * w) else c(36 - 8 * w, 74 + 16 * w)
+  } else if (kind == "L") {
+    if (harmonious_style == "sweep") c(34, 82) else c(42, 80)
+  } else {
+    if (harmonious_style == "sweep") c(24, 46) else c(34, 70)
   }
-
-  span <- diff(hue_range)
-  best_hues <- NULL
-  best_score <- -Inf
-  tries <- if (identical(cvd, "none")) 1L else max_tries
-  for (i in seq_len(tries)) {
-    set.seed(seed + i - 1L)
-    offset <- stats::runif(1, 0, span)
-    hues <- (hue_range[1] + offset + seq(0, span, length.out = n + 1)[seq_len(n)]) %% 360
-    if (identical(cvd, "none")) {
-      best_hues <- hues
-      break
-    }
-    swatch <- colorspace::hex(colorspace::polarLUV(L = lightness, C = chroma, H = hues), fixup = TRUE)
-    sim <- .perceptual_hex(swatch, cvd)
-    d <- color_distance(sim)
-    diag(d) <- NA
-    score <- min(d, na.rm = TRUE)
-    if (score > best_score) {
-      best_score <- score
-      best_hues <- hues
-    }
-    if (score >= min_dist) break
-  }
-  best_hues
+  pmin(pmax(rng, hard[1]), hard[2])
 }
 
-# ---- harmonious mode --------------------------------------------------
-
-#' Shades for one family at a fixed hue
-#'
-#' Interpolates jointly through lightness and chroma (dark/muted ->
-#' light/vivid) at a single hue, giving `m` perceptually graded shades of the
-#' same base color ("tone" variation), which is what harmonious mode uses to
-#' distinguish family members.
-#'
-#' @param m Number of members.
-#' @param hue Fixed hue in degrees.
-#' @param lightness_range,chroma_range Two-element numeric ranges.
-#' @return Character vector of `m` hex colors.
-#' @keywords internal
-.family_shades <- function(m, hue, lightness_range, chroma_range) {
-  if (m <= 0) return(character(0))
-  if (m == 1) {
-    L <- mean(lightness_range)
-    C <- mean(chroma_range)
-  } else {
-    L <- seq(lightness_range[1], lightness_range[2], length.out = m)
-    C <- seq(chroma_range[1], chroma_range[2], length.out = m)
+.resolve_range <- function(spec, kind, manual_hex, mode, harmonious_style, n_items = 8) {
+  if (is.numeric(spec) && length(spec) == 2) return(sort(as.numeric(spec)))
+  if (!identical(spec, "auto")) {
+    stop("`", kind, "` range must be a length-2 numeric vector or \"auto\"", call. = FALSE)
   }
-  colorspace::hex(colorspace::polarLUV(L = L, C = C, H = hue), fixup = TRUE)
+  hard <- if (kind == "L") c(16, 94) else c(4, 96)
+  min_span <- if (kind == "L") 24 else 16
+
+  if (length(manual_hex) >= 1) {
+    hcl <- .to_hcl(manual_hex)
+    v <- if (kind == "L") hcl[, "l"] else hcl[, "c"]
+    if (length(v) == 1) {
+      pad <- min_span / 2 + if (kind == "L") 6 else 4
+      rng <- c(v - pad, v + pad)
+    } else {
+      rng <- as.numeric(stats::quantile(v, c(0.05, 0.95), names = FALSE))
+      if (diff(rng) < min_span) {
+        mid <- mean(rng)
+        rng <- c(mid - min_span / 2, mid + min_span / 2)
+      }
+    }
+    return(pmin(pmax(sort(rng), hard[1]), hard[2]))
+  }
+  .auto_range_preset(kind, mode, harmonious_style, n_items)
+}
+
+# ---- family base hues --------------------------------------------------
+
+# manual_hue: named numeric (family_id -> hue in degrees) for families that
+# already carry a manual color; those are pinned and the rest placed around
+# them. forder: integer permutation of seq_along(family_ids) giving the
+# spatial order of families. fadj: logical family x family adjacency, or
+# NULL when no neighbor information is available.
+.assign_family_hues <- function(family_ids, forder, fadj, seed, neighbor_hues,
+                                 hue_range, harmonious_style, manual_hue = NULL) {
+  n <- length(family_ids)
+  hues <- stats::setNames(rep(NA_real_, n), family_ids)
+  if (!is.null(manual_hue)) {
+    for (fid in intersect(names(manual_hue), family_ids)) hues[fid] <- manual_hue[[fid]]
+  }
+  if (n == 0) return(hues)
+  set.seed(seed)
+  span_full <- diff(hue_range)
+  start <- (hue_range[1] + stats::runif(1, 0, span_full)) %% 360
+  ord_ids <- family_ids[forder]
+
+  if (n == 1) {
+    if (is.na(hues[1])) hues[1] <- start
+    return(hues)
+  }
+
+  if (neighbor_hues == "coherent") {
+    arc <- if (harmonious_style == "sweep") min(span_full, 150) else min(span_full, 280)
+    start <- .best_arc_start(arc, hue_range, seed)
+    grid <- (start + seq(0, arc, length.out = n)) %% 360
+    # align the grid to any manual pin (rotate so the pinned family's slot
+    # matches its actual hue), then fill the rest in spatial order.
+    pinned <- which(!is.na(hues[ord_ids]))
+    if (length(pinned)) {
+      shift <- .circ_signed(grid[pinned[1]], hues[ord_ids][pinned[1]])
+      grid <- (grid - shift) %% 360
+    }
+    free <- which(is.na(hues[ord_ids]))
+    hues[ord_ids[free]] <- grid[free]
+    return(hues)
+  }
+
+  # neighbor_hues == "contrast": evenly spaced hue slots, greedily assigned
+  # so each family sits as far as possible (on the wheel) from its already
+  # placed spatial neighbors, with a nudge away from the muddy zone.
+  slots <- (start + seq(0, 360, length.out = n + 1)[seq_len(n)]) %% 360
+  used <- rep(FALSE, n)
+  for (fid in names(manual_hue %||% list())) {
+    if (!fid %in% family_ids) next
+    j <- which.min(.circ_dist(slots, hues[fid]))
+    used[j] <- TRUE
+  }
+  for (fid in ord_ids) {
+    if (!is.na(hues[fid])) next
+    nb <- if (is.null(fadj)) character(0) else family_ids[fadj[fid, ]]
+    nb_h <- hues[nb]
+    nb_h <- nb_h[!is.na(nb_h)]
+    cand <- which(!used)
+    score <- vapply(cand, function(j) {
+      h <- slots[j]
+      base <- if (length(nb_h)) min(.circ_dist(h, nb_h)) else 180
+      base - 12 * .hue_muddiness_penalty(h)
+    }, numeric(1))
+    pick <- cand[which.max(score)]
+    hues[fid] <- slots[pick]
+    used[pick] <- TRUE
+  }
+  na <- which(is.na(hues))
+  if (length(na)) hues[na] <- .golden_hues(length(na), start)
+  hues
+}
+
+# signed circular difference a - b, in (-180, 180]
+.circ_signed <- function(a, b) {
+  d <- (a - b) %% 360
+  ifelse(d > 180, d - 360, d)
+}
+
+# ---- within-family member colors ------------------------------------
+
+# corder: seriation order of the family's members (permutation of seq_along
+# members). Members that are spatially adjacent get lightness slots that are
+# far apart (feature: neighboring subclusters -> far-away shades).
+.family_member_colors <- function(members, corder, fam_hue, l_band, c_band,
+                                   harmonious_style) {
+  m <- length(members)
+  if (m == 0) return(stats::setNames(character(0), character(0)))
+  if (m == 1) {
+    col <- .hcl_hex(fam_hue, mean(c_band), mean(l_band))
+    return(stats::setNames(col, members))
+  }
+
+  spread <- .spread_slots(m, cyclic = FALSE)
+  spatial_rank <- order(corder)
+  l_grid <- seq(l_band[1], l_band[2], length.out = m)
+  if (harmonious_style == "sweep") {
+    # near-constant chroma, essentially one hue: the multi-hue character of
+    # the palette comes from the family-to-family progression, not from
+    # within-family variation (matches the reference sweep's triplets).
+    c_grid <- rep(mean(c_band), m)
+    subarc <- 0
+  } else {
+    # graded shades of the family hue: more chroma when darker.
+    c_grid <- seq(c_band[2] * 0.92, c_band[1], length.out = m)
+    subarc <- 6
+  }
+
+  out <- character(m)
+  for (i in seq_len(m)) {
+    slot <- spread[spatial_rank[i]]
+    h <- (fam_hue + (slot - (m + 1) / 2) / m * subarc) %% 360
+    out[i] <- .hcl_hex(h, c_grid[slot], l_grid[slot])
+  }
+  stats::setNames(out, members)
+}
+
+# Global analogous "sweep": one monotone path through HCL space (rising
+# lightness, an analogous hue arc placed to skip the muddy yellow-green
+# zone, a gentle chroma bulge), cut into contiguous segments assigned to
+# families in spatial order. Within each family segment the path positions
+# are permuted (.spread_slots) so spatially-adjacent clusters land far apart
+# on the segment -> local shade contrast without breaking the global sweep.
+.harmonious_sweep <- function(ord_fam, member_order, l_range, c_range,
+                               hue_range, seed) {
+  ordered <- unlist(member_order[ord_fam], use.names = FALSE)
+  N <- length(ordered)
+  empty <- stats::setNames(character(0), character(0))
+  if (N == 0) return(list(cluster = empty, family = empty))
+
+  arc <- min(diff(hue_range), if (N <= 4) 85 else if (N <= 9) 120 else 150)
+  start <- .best_arc_start(arc, hue_range, seed)
+  tt <- if (N == 1) 0.5 else (seq_len(N) - 0.5) / N
+  h_path <- (start + tt * arc) %% 360
+  l_path <- l_range[1] + tt * diff(l_range)
+  c_path <- mean(c_range) + (diff(c_range) / 2) * 0.4 * sin(pi * tt)
+  path <- .hcl_hex(h_path, c_path, l_path)
+
+  cluster_col <- stats::setNames(rep(NA_character_, N), ordered)
+  family_col <- character(0)
+  p <- 0L
+  for (fid in ord_fam) {
+    ms <- member_order[[fid]]
+    m <- length(ms)
+    if (m == 0) next
+    idx <- p + seq_len(m)
+    sp <- .spread_slots(m, cyclic = FALSE)
+    for (j in seq_len(m)) cluster_col[ms[j]] <- path[idx[sp[j]]]
+    family_col[fid] <- path[idx[ceiling(m / 2)]]
+    p <- p + m
+  }
+  list(cluster = cluster_col, family = family_col)
 }
 
 # ---- contrast mode ------------------------------------------------------
 
+# Candidate pool for greedy max-min selection, drawn with the color-theory
+# constraints: low-discrepancy hues, lightness inside the resolved range,
+# chroma a randomised fraction of the per-(h,l) gamut ceiling (so vivid but
+# never neon / out-of-gamut).
+.contrast_pool <- function(n_target, seed, lightness_range, chroma_range,
+                            hue_range, pool_size = NULL) {
+  if (is.null(pool_size)) pool_size <- max(2600L, 90L * n_target)
+  set.seed(seed)
+  start <- stats::runif(1, 0, 360)
+  h <- .golden_hues(pool_size, start)
+  h <- hue_range[1] + (h / 360) * diff(hue_range)
+  l <- stats::runif(pool_size, lightness_range[1], lightness_range[2])
+  frac <- stats::runif(pool_size, 0.45, 0.85)
+  mc <- colorspace::max_chroma(h = h %% 360, l = pmin(pmax(l, 1), 99))
+  c_ <- pmin(pmax(chroma_range[1], frac * mc), chroma_range[2])
+  # thin out muddy yellow-green candidates (keep a few so coverage is still
+  # possible if a palette genuinely needs that region)
+  keep <- stats::runif(pool_size) > 0.78 * .hue_muddiness_penalty(h)
+  h <- h[keep]
+  l <- l[keep]
+  c_ <- c_[keep]
+  unique(colorspace::hex(colorspace::polarLUV(L = l, C = c_, H = h), fixup = TRUE))
+}
+
 #' Greedy max-min ("Glasbey-style") color selection
 #'
-#' Builds a large candidate pool of HCL colors and greedily picks the
-#' candidate that maximizes the minimum perceptual distance to colors
-#' already chosen (including any fixed/manual colors passed in as a
-#' starting set), repeated until `n` colors are chosen. This is the standard
-#' approach for maximally-distinguishable qualitative palettes in a
-#' perceptually uniform space.
+#' Greedily picks, from a candidate pool, the color that maximizes the
+#' minimum perceptual distance to colors already chosen (including any
+#' fixed/manual colors passed in), repeated until `n` colors are chosen.
 #'
 #' @param n Number of new colors to choose.
 #' @param seed Random seed for candidate pool generation.
-#' @param lightness_range,chroma_range,hue_range Ranges to draw candidates
-#'   from.
-#' @param fixed_hex Character vector of colors already in use (e.g. manual
-#'   overrides); the selection avoids clashing with these but does not
-#'   return them.
-#' @param cvd `"none"` or a CVD type; when set, distances are computed on
-#'   the CVD-simulated candidates so the chosen palette stays distinguishable
-#'   under that deficiency.
-#' @param pool_size Size of the random candidate pool to search.
+#' @param lightness_range,chroma_range,hue_range Ranges the candidate pool
+#'   is drawn from.
+#' @param fixed_hex Colors already in use (manual overrides); selection
+#'   avoids clashing with these but does not return them.
+#' @param cvd `"none"` or a CVD type; distances are then computed on the
+#'   CVD-simulated colors.
 #' @return Character vector of `n` hex colors.
 #' @keywords internal
 .contrast_colors <- function(n, seed, lightness_range, chroma_range,
                               hue_range = c(0, 360), fixed_hex = character(0),
-                              cvd = "none", pool_size = 2000) {
+                              cvd = "none") {
   if (n <= 0) return(character(0))
-  set.seed(seed)
-  h <- stats::runif(pool_size, hue_range[1], hue_range[2])
-  l <- stats::runif(pool_size, lightness_range[1], lightness_range[2])
-  c_ <- stats::runif(pool_size, chroma_range[1], chroma_range[2])
-  pool <- unique(colorspace::hex(colorspace::polarLUV(L = l, C = c_, H = h), fixup = TRUE))
+  pool <- .contrast_pool(n, seed, lightness_range, chroma_range, hue_range)
   pool <- setdiff(pool, fixed_hex)
 
-  pool_space <- .perceptual_hex(pool, cvd)
-  pool_lab <- farver::decode_colour(pool_space, to = "lab")
-
-  chosen <- character(0)
+  pool_lab <- farver::decode_colour(.perceptual_hex(pool, cvd), to = "lab")
   chosen_lab <- if (length(fixed_hex) > 0) {
     farver::decode_colour(.perceptual_hex(fixed_hex, cvd), to = "lab")
   } else {
-    matrix(numeric(0), ncol = 3, dimnames = list(NULL, c("l", "a", "b")))
+    matrix(numeric(0), ncol = 3)
   }
 
-  min_dist_to_chosen <- if (nrow(chosen_lab) > 0) {
+  min_dist <- if (nrow(chosen_lab) > 0) {
     apply(farver::compare_colour(pool_lab, chosen_lab, from_space = "lab", method = "CIE2000"), 1, min)
   } else {
     rep(Inf, nrow(pool_lab))
   }
 
+  chosen <- character(0)
   for (i in seq_len(min(n, length(pool)))) {
-    best <- which.max(min_dist_to_chosen)
+    best <- which.max(min_dist)
     chosen <- c(chosen, pool[best])
-    new_lab <- pool_lab[best, , drop = FALSE]
-    d_new <- as.numeric(farver::compare_colour(pool_lab, new_lab, from_space = "lab", method = "CIE2000"))
-    min_dist_to_chosen <- pmin(min_dist_to_chosen, d_new)
-    min_dist_to_chosen[best] <- -Inf # never repick
+    d_new <- as.numeric(farver::compare_colour(
+      pool_lab, pool_lab[best, , drop = FALSE],
+      from_space = "lab", method = "CIE2000"
+    ))
+    min_dist <- pmin(min_dist, d_new)
+    min_dist[best] <- -Inf
   }
   if (length(chosen) < n) {
-    # pool exhausted (extreme n or narrow ranges): recycle with jitter
-    extra <- n - length(chosen)
-    chosen <- c(chosen, sample(pool, extra, replace = TRUE))
+    chosen <- c(chosen, sample(pool, n - length(chosen), replace = TRUE))
   }
   chosen
 }
@@ -205,119 +331,180 @@ simulate_cvd <- function(hex, type = c("deutan", "protan", "tritan"), severity =
 #' Generate a cluster/family color palette
 #'
 #' The core color-generation entry point. Given a cluster -> family
-#' assignment, computes one base hue per family and either shades within
-#' that hue (`mode = "harmonious"`) or a maximally-distinguishable color per
-#' cluster (`mode = "contrast"`), with family membership always carried in
-#' `$families$color` as a secondary channel (a header/tag/outline color).
+#' assignment, it places one base hue per family and then colors each
+#' cluster, in one of two modes:
+#'
+#' * `mode = "harmonious"` -- a coordinated palette in HCL space.
+#'   `harmonious_style = "sweep"` (default) lays families along a single
+#'   analogous hue arc with a shared monotone lightness ramp and muted
+#'   chroma (a smooth blue -> purple -> rose -> tan style sweep);
+#'   `harmonious_style = "per_family"` gives each family its own hue and
+#'   colors its members as graded shades of it.
+#' * `mode = "contrast"` -- every cluster gets a maximally-distinguishable
+#'   color via greedy max-min selection in Lab space; family membership is
+#'   carried by `$families$color` as a secondary channel.
+#'
+#' Neighbor-awareness: when `neighbors` is supplied, families that are
+#' adjacent in the embedding/graph get **contrasting** hues by default
+#' (`neighbor_hues = "contrast"`, the default in contrast mode) or
+#' **analogous** hues (`neighbor_hues = "coherent"`, the default in
+#' harmonious mode); and within a family, spatially-adjacent clusters are
+#' given far-apart lightness for local contrast.
 #'
 #' Passing a previous `session` makes this incremental: any cluster or
-#' family with `manual_color == TRUE` keeps its stored color untouched, and
-#' the algorithm treats those fixed colors as already "used" so newly
-#' generated colors avoid clashing with them. This is what lets a UI call
-#' `generate_palette()` again and again (new mode, new seed, edited
-#' families) without ever clobbering a user's manual picks.
+#' family with `manual_color == TRUE` keeps its color, the generator treats
+#' those as fixed and avoids clashing with them, and with
+#' `lightness_range`/`chroma_range` left at `"auto"` the non-manual colors
+#' are regenerated inside the L/C envelope implied by the manual picks.
 #'
-#' @param assignment A data frame with columns `cluster`, `family_id` (e.g.
-#'   `detect_families(pdata)$assignment`, possibly hand-edited).
-#' @param session An existing `palettome_session` (from a previous call) to
-#'   preserve manual overrides from, or `NULL` for a fresh palette.
+#' @param assignment A data frame with columns `cluster`, `family_id`.
+#' @param session An existing `palettome_session` to inherit manual
+#'   overrides from, or `NULL`.
 #' @param mode `"harmonious"` or `"contrast"`.
-#' @param seed Random seed (family hue order / contrast candidate pool).
-#' @param lightness_range,chroma_range Two-element numeric ranges in HCL
-#'   space (roughly `[0, 100]`) controlling generated shade/tint/tone.
-#' @param hue_range Two-element numeric range in degrees to draw hues from.
-#' @param cvd `"none"`, or `"deutan"`/`"protan"`/`"tritan"` to bias
-#'   generation towards staying distinguishable under that color-vision
-#'   deficiency.
-#' @param n_cells Optional named integer vector or data frame with
-#'   `cluster`/`n_cells` columns, stored on the session for convenience
-#'   (e.g. sizing legend swatches) but not used in color choice.
-#' @return A `palettome_session` object (see the package README for the
-#'   full JSON schema): a list with `schema_version`, `clusters` (data frame:
-#'   `cluster`, `family_id`, `color`, `manual_color`, `n_cells`), `families`
-#'   (data frame: `family_id`, `color`, `manual_color`), and `params`.
+#' @param harmonious_style `"sweep"` or `"per_family"` (only used when
+#'   `mode = "harmonious"`).
+#' @param neighbor_hues `"contrast"`, `"coherent"`, or `NULL` to follow the
+#'   mode (contrast -> `"contrast"`, harmonious -> `"coherent"`).
+#' @param neighbors Optional neighbor information used to order families and
+#'   clusters in space: a data frame of centroids (`cluster` + `*_centroid`
+#'   or coordinate columns, e.g. [compute_centroids()]) or a square
+#'   cluster-by-cluster connectivity/distance matrix. `NULL` disables
+#'   neighbor-aware placement (falls back to even hue spacing).
+#' @param seed Random seed.
+#' @param lightness_range,chroma_range Length-2 numeric ranges in HCL space,
+#'   or `"auto"` (default) to derive them from manual overrides when present
+#'   and from mode/style presets otherwise.
+#' @param hue_range Length-2 numeric range in degrees to draw hues from.
+#' @param cvd `"none"`, `"deutan"`, `"protan"`, or `"tritan"`.
+#' @param n_cells Optional named integer vector or `cluster`/`n_cells` data
+#'   frame, stored on the session for convenience.
+#' @return A `palettome_session` object (see the package README for the JSON
+#'   schema).
 #' @export
 generate_palette <- function(assignment, session = NULL,
                               mode = c("harmonious", "contrast"),
+                              harmonious_style = c("sweep", "per_family"),
+                              neighbor_hues = NULL,
+                              neighbors = NULL,
                               seed = 1,
-                              lightness_range = c(35, 85),
-                              chroma_range = c(35, 90),
+                              lightness_range = "auto",
+                              chroma_range = "auto",
                               hue_range = c(0, 360),
                               cvd = c("none", "deutan", "protan", "tritan"),
                               n_cells = NULL) {
   mode <- match.arg(mode)
+  harmonious_style <- match.arg(harmonious_style)
   cvd <- match.arg(cvd)
+  if (is.null(neighbor_hues)) {
+    neighbor_hues <- if (mode == "contrast") "contrast" else "coherent"
+  }
+  neighbor_hues <- match.arg(neighbor_hues, c("contrast", "coherent"))
   stopifnot(
     "`assignment` must have `cluster` and `family_id` columns" =
       all(c("cluster", "family_id") %in% names(assignment))
   )
   assignment <- unique(assignment[, c("cluster", "family_id")])
+  assignment$cluster <- as.character(assignment$cluster)
+  assignment$family_id <- as.character(assignment$family_id)
   family_ids <- unique(assignment$family_id)
+  clusters <- assignment$cluster
 
   prev_cluster <- if (!is.null(session)) session$clusters else NULL
   prev_family <- if (!is.null(session)) session$families else NULL
-
   manual_cluster_colors <- .lookup_manual(prev_cluster, "cluster")
   manual_family_colors <- .lookup_manual(prev_family, "family_id")
+  manual_hex_all <- unlist(c(manual_cluster_colors, manual_family_colors), use.names = FALSE)
 
-  # ---- family base hues (skip families that are fully manually colored) --
-  fam_needs_hue <- setdiff(family_ids, names(manual_family_colors))
-  hues <- .pick_family_hues(
-    length(fam_needs_hue), seed = seed, hue_range = hue_range,
-    lightness = mean(lightness_range), chroma = mean(chroma_range), cvd = cvd
+  n_items <- if (mode == "contrast") length(clusters) else length(family_ids)
+  l_range <- .resolve_range(lightness_range, "L", manual_hex_all, mode, harmonious_style, n_items)
+  c_range <- .resolve_range(chroma_range, "C", manual_hex_all, mode, harmonious_style, n_items)
+
+  # ---- neighbor structure ------------------------------------------
+  cdist <- .cluster_distance(neighbors, clusters)
+  if (!is.null(cdist)) {
+    fdist <- .family_distance(cdist, assignment)
+    forder <- .seriate_order(fdist)
+    fadj <- .knn_adjacency(fdist)
+  } else {
+    forder <- seq_along(family_ids)
+    fadj <- NULL
+  }
+
+  # spatial order of families and, within each family, of its clusters
+  ord_fam <- family_ids[forder]
+  member_order <- stats::setNames(vector("list", length(family_ids)), family_ids)
+  for (fid in family_ids) {
+    members <- clusters[assignment$family_id == fid]
+    co <- if (!is.null(cdist) && length(members) > 1) {
+      .seriate_order(cdist[members, members, drop = FALSE])
+    } else {
+      seq_along(members)
+    }
+    member_order[[fid]] <- members[co]
+  }
+
+  # ---- family hues (per_family / contrast secondary channel) ------
+  manual_family_hue <- if (length(manual_family_colors)) {
+    stats::setNames(.to_hcl(unlist(manual_family_colors))[, "h"], names(manual_family_colors))
+  } else {
+    NULL
+  }
+  fam_hue <- .assign_family_hues(
+    family_ids, forder, fadj, seed, neighbor_hues, hue_range,
+    harmonious_style, manual_family_hue
   )
-  fam_hue <- stats::setNames(as.list(hues), fam_needs_hue)
 
   family_color <- character(0)
   for (fid in family_ids) {
-    if (fid %in% names(manual_family_colors)) {
-      family_color[fid] <- manual_family_colors[[fid]]
+    family_color[fid] <- if (fid %in% names(manual_family_colors)) {
+      manual_family_colors[[fid]]
     } else {
-      swatch <- colorspace::hex(
-        colorspace::polarLUV(L = mean(lightness_range), C = mean(chroma_range), H = fam_hue[[fid]]),
-        fixup = TRUE
-      )
-      family_color[fid] <- swatch
+      .hcl_hex(fam_hue[[fid]], mean(c_range), mean(l_range))
     }
   }
 
   # ---- per-cluster colors --------------------------------------------
-  cluster_color <- stats::setNames(rep(NA_character_, nrow(assignment)), assignment$cluster)
+  cluster_color <- stats::setNames(rep(NA_character_, length(clusters)), clusters)
   for (cl in names(manual_cluster_colors)) {
     if (cl %in% names(cluster_color)) cluster_color[cl] <- manual_cluster_colors[[cl]]
   }
 
-  if (mode == "harmonious") {
+  if (mode == "harmonious" && harmonious_style == "sweep") {
+    sweep <- .harmonious_sweep(
+      ord_fam, member_order, l_range, c_range, hue_range, seed
+    )
+    for (cl in names(sweep$cluster)) {
+      if (is.na(cluster_color[cl])) cluster_color[cl] <- sweep$cluster[[cl]]
+    }
+    for (fid in names(sweep$family)) {
+      if (!fid %in% names(manual_family_colors)) family_color[fid] <- sweep$family[[fid]]
+    }
+  } else if (mode == "harmonious") {
     for (fid in family_ids) {
-      members <- assignment$cluster[assignment$family_id == fid]
+      members <- member_order[[fid]]
       todo <- members[is.na(cluster_color[members])]
-      if (length(todo) == 0) next
-      hue <- if (fid %in% names(fam_hue)) {
-        fam_hue[[fid]]
-      } else {
-        as.numeric(colorspace::coords(methods::as(colorspace::hex2RGB(family_color[[fid]]), "polarLUV"))[, "H"])
-      }
-      shades <- .family_shades(length(todo), hue, lightness_range, chroma_range)
-      cluster_color[todo] <- shades
+      if (!length(todo)) next
+      cols <- .family_member_colors(
+        members, seq_along(members), fam_hue[[fid]], l_range, c_range, "per_family"
+      )
+      cluster_color[todo] <- cols[todo]
     }
   } else {
     fixed_hex <- unname(cluster_color[!is.na(cluster_color)])
     todo <- names(cluster_color)[is.na(cluster_color)]
-    if (length(todo) > 0) {
-      new_colors <- .contrast_colors(
-        length(todo), seed = seed, lightness_range = lightness_range,
-        chroma_range = chroma_range, hue_range = hue_range,
+    if (length(todo)) {
+      cluster_color[todo] <- .contrast_colors(
+        length(todo), seed, l_range, c_range, hue_range,
         fixed_hex = fixed_hex, cvd = cvd
       )
-      cluster_color[todo] <- new_colors
     }
   }
 
   clusters_df <- data.frame(
-    cluster = assignment$cluster,
+    cluster = clusters,
     family_id = assignment$family_id,
-    color = unname(cluster_color[assignment$cluster]),
-    manual_color = assignment$cluster %in% names(manual_cluster_colors),
+    color = unname(cluster_color[clusters]),
+    manual_color = clusters %in% names(manual_cluster_colors),
     stringsAsFactors = FALSE
   )
   clusters_df$n_cells <- .lookup_n_cells(n_cells, clusters_df$cluster, prev_cluster)
@@ -335,9 +522,16 @@ generate_palette <- function(assignment, session = NULL,
       clusters = clusters_df,
       families = families_df,
       params = list(
-        mode = mode, seed = seed,
-        lightness_range = lightness_range, chroma_range = chroma_range,
-        hue_range = hue_range, cvd = cvd
+        mode = mode,
+        harmonious_style = harmonious_style,
+        neighbor_hues = neighbor_hues,
+        seed = seed,
+        lightness_range = l_range,
+        chroma_range = c_range,
+        hue_range = hue_range,
+        cvd = cvd,
+        auto_lightness = identical(lightness_range, "auto"),
+        auto_chroma = identical(chroma_range, "auto")
       )
     ),
     class = "palettome_session"
@@ -358,15 +552,48 @@ generate_palette <- function(assignment, session = NULL,
     out[common] <- m[common]
   }
   if (!is.null(n_cells)) {
-    if (is.data.frame(n_cells)) {
-      m <- stats::setNames(n_cells$n_cells, n_cells$cluster)
-    } else {
-      m <- n_cells
-    }
+    m <- if (is.data.frame(n_cells)) stats::setNames(n_cells$n_cells, n_cells$cluster) else n_cells
     common <- intersect(clusters, names(m))
     out[common] <- m[common]
   }
   unname(out)
+}
+
+#' Snap a hand-picked color into the palette's aesthetic envelope
+#'
+#' Feature companion to manual recoloring: keeps the hue you chose but pulls
+#' its lightness and chroma to something in-gamut and coherent -- either
+#' matched to the lightness/chroma distribution of an existing `session`
+#' (so a hand-picked color sits with the rest), or, with no session, toward
+#' the natural lightness for that hue and a pleasing (non-neon) chroma.
+#'
+#' @param color A hex color string.
+#' @param session Optional `palettome_session` whose current colors define
+#'   the target L/C register.
+#' @param target `"auto"` (keep near the input chroma), `"muted"`, or
+#'   `"vivid"`.
+#' @return A hex color string with the same hue, adjusted L/C.
+#' @export
+optimize_color <- function(color, session = NULL, target = c("auto", "muted", "vivid")) {
+  target <- match.arg(target)
+  hcl <- .to_hcl(color)
+  h <- hcl[1, "h"]
+  c0 <- hcl[1, "c"]
+  l0 <- hcl[1, "l"]
+
+  if (!is.null(session) && nrow(session$clusters) > 0) {
+    o <- .to_hcl(session$clusters$color)
+    l <- 0.5 * l0 + 0.5 * stats::median(o[, "l"])
+    c_t <- 0.5 * c0 + 0.5 * stats::median(o[, "c"])
+  } else {
+    l <- 0.55 * l0 + 0.45 * .natural_lightness(h)
+    c_t <- switch(target,
+      muted = 26,
+      vivid = .pleasing_chroma(h, l, frac = 0.9),
+      auto = c0
+    )
+  }
+  unname(.hcl_hex(h, c_t, l, chroma_frac = 0.9))
 }
 
 #' Manually set a cluster's or family's color
@@ -405,8 +632,8 @@ set_manual_color <- function(session, cluster = NULL, family = NULL, color) {
 #'   reset all clusters/families respectively. Defaults to resetting
 #'   everything.
 #' @return The updated `palettome_session` (colors are left as-is; only the
-#'   `manual_color` flags are cleared — call [generate_palette()] again to
-#'   actually recompute the now-unlocked colors).
+#'   `manual_color` flags are cleared -- call [generate_palette()] again to
+#'   recompute the now-unlocked colors).
 #' @export
 reset_overrides <- function(session, cluster = TRUE, family = TRUE) {
   stopifnot(inherits(session, "palettome_session"))

@@ -4,12 +4,16 @@
 \alias{plot_swatches}
 \title{Standalone swatch/legend figure, grouped by family}
 \usage{
-plot_swatches(session, cvd = "none")
+plot_swatches(session, cvd = "none", order_by = c("lightness", "id"))
 }
 \arguments{
 \item{session}{A \code{palettome_session}.}
 
 \item{cvd}{\code{"none"} or a CVD type to preview the swatches under.}
+
+\item{order_by}{\code{"lightness"} (default) sorts families, and clusters
+within each family, by lightness so a harmonious sweep reads as a
+continuous ramp; \code{"id"} keeps \code{family_id} / \code{cluster} order.}
 }
 \value{
 Invisibly, \code{NULL}; draws to the current graphics device.

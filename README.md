@@ -4,20 +4,34 @@ Hierarchy-aware, interactively editable color palettes for clustered data —
 built for scRNA-seq clusters/cell subtypes (Seurat, UMAP) but not
 hard-dependent on Seurat.
 
-Clusters that belong to the same **family** (e.g. subtypes of T cells,
-subtypes of myeloid cells) can be colored either:
+> LLM was used in this project to speed up the development.
 
-LLM was used in this project to speed up the development.
+Clusters that belong to the same **family** / compartment (e.g. subtypes of
+T cells, subtypes of myeloid cells) can be colored either:
 
-- **harmonious** — family members share a base hue and vary only in
-  shade/tint/tone, while distinct families get maximally separated hues, or
-- **contrast** — every cluster gets a maximally distinguishable color, with
-  family membership still visible through a secondary color channel (the
-  family's own accent/tag color).
+- **harmonious** — a coordinated palette in a perceptually uniform space.
+  `harmonious_style = "sweep"` (default) lays the families along one
+  analogous hue arc with a shared monotone lightness ramp and muted chroma
+  (a smooth blue → purple → rose → tan style progression);
+  `harmonious_style = "per_family"` gives each family its own hue and colors
+  its members as graded shades of it.
+- **contrast** — every cluster gets a maximally distinguishable color
+  (greedy max-min selection in Lab space), with family membership still
+  visible through a secondary color channel (the family's own accent/tag
+  color).
+
+Color choice is color-theory aware even for random seeds: chroma is kept
+inside the displayable gamut and away from the neon and muddy yellow-green
+zones, hues are spread with a low-discrepancy sequence, and each hue gets
+its natural lightness. When neighbor information is supplied, families that
+are **adjacent** in the embedding get contrasting hues by default (or
+analogous, by choice — `neighbor_hues`), and within a family
+spatially-adjacent clusters are given far-apart shades for local contrast.
 
 Every generated color can be overridden by hand, and manual overrides
 survive re-running the generator (new mode, new seed, edited families) until
-explicitly reset.
+explicitly reset; while manual overrides are in place the remaining colors
+auto-fit to the lightness/chroma envelope of your picks.
 
 ## Core vs. UI
 
@@ -41,7 +55,7 @@ the rest of the package.
 |---|---|
 | `as_cluster_data()`, `compute_centroids()` | Core |
 | `detect_families()`, `compute_family_dendrogram()`, `cut_families()`, `plot_dendrogram()` | Core |
-| `generate_palette()`, `set_manual_color()`, `reset_overrides()` | Core |
+| `generate_palette()`, `set_manual_color()`, `reset_overrides()`, `optimize_color()` | Core |
 | `cluster_colors()`, `family_colors()` | Core |
 | `color_distance()`, `simulate_cvd()` | Core |
 | `downsample_stratified()` | Core |
@@ -61,17 +75,40 @@ pdata <- as_cluster_data(
 )
 
 fam <- detect_families(pdata, k = 4)          # auto-detect via hclust
-session <- generate_palette(fam$assignment, mode = "harmonious", seed = 1)
+
+# fam$neighbors carries centroids (or a connectivity matrix) so families and
+# clusters can be placed in space — pass it through for neighbor-aware color
+session <- generate_palette(
+  fam$assignment,
+  mode = "harmonious", harmonious_style = "sweep",
+  neighbors = fam$neighbors, seed = 1
+)
 
 plot_palette_static(pdata, session)           # ggplot2 if installed, base R otherwise
+plot_swatches(session)                        # family-grouped swatch legend
 export_palette_json(session, "palette.json")
 ```
+
+Key `generate_palette()` arguments:
+
+| argument | meaning |
+|---|---|
+| `mode` | `"harmonious"` or `"contrast"` |
+| `harmonious_style` | `"sweep"` (one analogous multi-hue sweep) or `"per_family"` (one hue per family, shaded) |
+| `neighbor_hues` | `"contrast"` / `"coherent"`, or `NULL` to follow the mode (contrast→contrast, harmonious→coherent) |
+| `neighbors` | centroids data frame or connectivity matrix; `NULL` disables neighbor-aware placement |
+| `lightness_range`, `chroma_range` | length-2 numeric, or `"auto"` (default): derived from manual picks if any, else from mode/style presets |
+| `seed`, `hue_range`, `cvd` | random seed; hue window in degrees; `"none"`/`"deutan"`/`"protan"`/`"tritan"` |
 
 To resume editing later, or hand off manual overrides:
 
 ```r
+session <- set_manual_color(session, cluster = "3", color = "#2E5A87")
 session2 <- generate_palette(fam$assignment, session = session, mode = "contrast")
-# clusters/families with manual_color == TRUE keep their color unchanged
+# clusters/families with manual_color == TRUE keep their color unchanged;
+# with lightness_range/chroma_range = "auto" the rest fit to the manual picks
+
+optimize_color("#7B00FF", session = session2)  # snap a hand-picked hex into the palette envelope
 ```
 
 `session$clusters`/`session$families` are already plain data frames (see
@@ -121,11 +158,15 @@ launch_palettome_ui(pdata, session = session) # resume a saved session
 ```
 
 The app shows a WebGL (`plotly` `scattergl`) scatter plot of the embedding,
-a family dendrogram, and a drag-and-drop family panel: drag a cluster chip
-into a different family bin to regroup it, or click a chip/family header to
-open a color picker. Mode, seed, lightness/chroma range, and a colorblind
-simulation preview are all live. Sessions export as JSON/CSV, and the final
-plot exports as a full-resolution PNG.
+a family dendrogram, and a drag-and-drop compartment panel: drag a cluster
+chip into a different family bin to regroup it, hit **+ Add compartment** to
+make a new (empty, dashed) bin to drag clusters into, and empty compartments
+are removed automatically. Click a chip or family header to open a color
+picker (with an **Optimize** button that snaps the pick into the palette's
+envelope). Mode, harmonious style, neighbor-hue rule, seed, an auto /
+manual light-chroma toggle, and a colorblind simulation preview are all
+live. Sessions export as JSON/CSV, and the final plot exports as a
+full-resolution PNG.
 
 ## The JSON schema (stable contract)
 
@@ -147,24 +188,31 @@ schema changes.
   ],
   "params": {
     "mode": "harmonious",
+    "harmonious_style": "sweep",
+    "neighbor_hues": "coherent",
     "seed": 1,
-    "lightness_range": [35, 85],
-    "chroma_range": [35, 90],
+    "lightness_range": [34, 82],
+    "chroma_range": [24, 46],
     "hue_range": [0, 360],
-    "cvd": "none"
+    "cvd": "none",
+    "auto_lightness": true,
+    "auto_chroma": true
   }
 }
 ```
 
 - `clusters[].color` is the per-cluster fill color actually used for plotting.
 - `families[].color` is the family's representative/accent color: in
-  harmonious mode it's the shared base hue clusters are shaded from; in
-  contrast mode it's the secondary channel (e.g. an outline/tag color) that
-  shows family membership even though cluster colors themselves are
-  maximally spread apart.
+  harmonious mode it's a point on the family's part of the sweep (or the
+  family's base hue for `per_family`); in contrast mode it's the secondary
+  channel that shows family membership even though cluster colors themselves
+  are maximally spread apart.
 - `manual_color: true` marks an entry a person set by hand; `generate_palette()`
   never overwrites these unless `reset_overrides()` is called first.
 - `n_cells` is informational (legend sizing, etc.) and optional/nullable.
+- `params.lightness_range` / `chroma_range` are always the **resolved**
+  numeric ranges; `auto_lightness` / `auto_chroma` record whether they were
+  derived automatically (so a reload can keep auto-fitting).
 
 CSV export (`export_palette_csv()`) writes the `clusters` table (and
 optionally the `families` table) as plain CSV with the same column names.
@@ -203,7 +251,12 @@ recoloring never touch the raw per-cell table at all.
 devtools::test()
 ```
 
-Covers: perceptual-distance thresholds for contrast-mode selection, hue
-separation between families in harmonious mode, and that manual overrides
-survive `generate_palette()` re-runs (including across a family
-reassignment).
+Covers: perceptual-distance thresholds and gamut/muddy-zone constraints for
+contrast-mode selection; the harmonious sweep being a monotone-lightness
+analogous progression; `neighbor_hues` switching adjacent families between
+analogous and contrasting; spatially-adjacent subclusters getting far-apart
+shades; `lightness_range = "auto"` fitting to manual picks; `optimize_color()`
+preserving hue; and manual overrides surviving `generate_palette()` re-runs
+(including across a family reassignment). Plus unit tests for the
+color-theory primitives (`R/color_theory.R`) and adjacency helpers
+(`R/adjacency.R`).

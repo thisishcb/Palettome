@@ -22,13 +22,17 @@
 #'   [import_palette_json()]) to resume editing, preserving prior manual
 #'   overrides. If `NULL`, a fresh harmonious palette is generated.
 #' @param k,h Passed to [detect_families()] when `families` is `NULL`.
+#' @param connectivity Optional cluster-by-cluster connectivity/distance
+#'   matrix passed to [detect_families()] and used for neighbor-aware
+#'   coloring; when `NULL`, cluster centroids are used instead.
 #' @param preview_max_n Passed to [downsample_stratified()] for the live
 #'   scatter plot; the full dataset is only used for the final PNG export.
 #' @param ... Passed on to `shiny::runApp()` (e.g. `launch.browser`, `port`).
 #' @return Does not return; runs the Shiny app until interrupted.
 #' @export
 launch_palettome_ui <- function(pdata, families = NULL, session = NULL,
-                                 k = NULL, h = NULL, preview_max_n = 50000, ...) {
+                                 k = NULL, h = NULL, connectivity = NULL,
+                                 preview_max_n = 50000, ...) {
   required <- c("shiny", "plotly", "colourpicker", "shinyjs")
   missing <- required[!vapply(required, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing) > 0) {
@@ -44,27 +48,34 @@ launch_palettome_ui <- function(pdata, families = NULL, session = NULL,
   }
   stopifnot(inherits(pdata, "palettome_data"))
 
+  centroids <- compute_centroids(pdata)
+
   fam_result <- if (!is.null(families)) {
     if (inherits(families, "palettome_families")) {
       families
     } else {
-      structure(list(assignment = families, method = "explicit", dendro = NULL),
+      structure(
+        list(
+          assignment = families, method = "explicit", dendro = NULL,
+          neighbors = if (!is.null(connectivity)) connectivity else centroids
+        ),
         class = "palettome_families"
       )
     }
   } else {
-    detect_families(pdata, k = k, h = h)
+    detect_families(pdata, k = k, h = h, connectivity = connectivity)
   }
 
-  centroids <- compute_centroids(pdata)
+  neighbors <- fam_result$neighbors %||% centroids
   init_session <- session %||% generate_palette(
     fam_result$assignment,
-    mode = "harmonious", seed = 1,
+    mode = "harmonious", seed = 1, neighbors = neighbors,
     n_cells = centroids[, c("cluster", "n_cells")]
   )
 
   assign("pdata", pdata, envir = .pt_env)
   assign("centroids", centroids, envir = .pt_env)
+  assign("neighbors", neighbors, envir = .pt_env)
   assign("assignment", fam_result$assignment, envir = .pt_env)
   assign("dendro", fam_result$dendro, envir = .pt_env)
   assign("session", init_session, envir = .pt_env)

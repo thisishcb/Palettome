@@ -45,7 +45,10 @@ compute_family_dendrogram <- function(pdata, dist_method = "euclidean",
 
   hc <- stats::hclust(d, method = hclust_method)
   hc$labels <- clusters
-  list(hclust = hc, centroids = centroids, clusters = clusters)
+  list(
+    hclust = hc, centroids = centroids, clusters = clusters,
+    connectivity = connectivity
+  )
 }
 
 #' Cut a precomputed dendrogram into families
@@ -96,6 +99,10 @@ cut_families <- function(dendro, k = NULL, h = NULL) {
 #'     \item{dendro}{The `compute_family_dendrogram()` result, or `NULL` if
 #'       `method == "explicit"`; kept so a UI can preview/re-cut the
 #'       dendrogram without recomputation.}
+#'     \item{neighbors}{Neighbor information ready to pass to
+#'       [generate_palette()] -- the supplied `connectivity` matrix if any,
+#'       otherwise the cluster centroids -- so neighbor-aware coloring works
+#'       without recomputing anything.}
 #'   }
 #' @export
 detect_families <- function(pdata, k = NULL, h = NULL,
@@ -103,6 +110,8 @@ detect_families <- function(pdata, k = NULL, h = NULL,
                              hclust_method = "average",
                              connectivity = NULL) {
   stopifnot(inherits(pdata, "palettome_data"))
+  centroids <- compute_centroids(pdata)
+  neighbors <- if (!is.null(connectivity)) connectivity else centroids
 
   if (isTRUE(pdata$has_family)) {
     assignment <- unique(pdata$cells[, c("cluster", "family")])
@@ -110,7 +119,10 @@ detect_families <- function(pdata, k = NULL, h = NULL,
     assignment <- assignment[order(assignment$cluster), ]
     rownames(assignment) <- NULL
     return(structure(
-      list(assignment = assignment, method = "explicit", dendro = NULL),
+      list(
+        assignment = assignment, method = "explicit", dendro = NULL,
+        neighbors = neighbors
+      ),
       class = "palettome_families"
     ))
   }
@@ -126,7 +138,8 @@ detect_families <- function(pdata, k = NULL, h = NULL,
     list(
       assignment = assignment,
       method = if (is.null(connectivity)) "hclust" else "graph",
-      dendro = dendro
+      dendro = dendro,
+      neighbors = neighbors
     ),
     class = "palettome_families"
   )

@@ -10,6 +10,7 @@ launch_palettome_ui(
   session = NULL,
   k = NULL,
   h = NULL,
+  connectivity = NULL,
   preview_max_n = 50000,
   ...
 )
@@ -27,6 +28,10 @@ seed the initial grouping. If \code{NULL}, \code{\link[=detect_families]{detect_
 overrides. If \code{NULL}, a fresh harmonious palette is generated.}
 
 \item{k, h}{Passed to \code{\link[=detect_families]{detect_families()}} when \code{families} is \code{NULL}.}
+
+\item{connectivity}{Optional cluster-by-cluster connectivity/distance
+matrix passed to \code{\link[=detect_families]{detect_families()}} and used for neighbor-aware
+coloring; when \code{NULL}, cluster centroids are used instead.}
 
 \item{preview_max_n}{Passed to \code{\link[=downsample_stratified]{downsample_stratified()}} for the live
 scatter plot; the full dataset is only used for the final PNG export.}

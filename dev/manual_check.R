@@ -28,24 +28,45 @@ fam <- detect_families(pdata, k = 4)
 print(fam$assignment)
 plot_dendrogram(fam$dendro, k = 4) # opens a plot window/device
 
-# ---- 3. Generate a palette, look at it -------------------------------------
-sess <- generate_palette(fam$assignment, mode = "harmonious", seed = 1)
-print(sess$clusters)
-print(sess$families)
-plot_palette_static(pdata, sess) # ggplot2 object if installed -> auto-prints
-plot_swatches(sess) # base-graphics swatch/legend figure
+# ---- 3. Generate palettes, look at them ----------------------------------
+# "sweep" (default): one coordinated multi-hue analogous sweep, families as
+# contiguous arcs; pass neighbors so families/clusters are placed in space.
+sweep <- generate_palette(fam$assignment, mode = "harmonious",
+  harmonious_style = "sweep", neighbors = fam$neighbors, seed = 1)
+print(sweep$clusters)
+plot_swatches(sweep) # ordered by lightness -> reads as a ramp
+
+# "per_family": each family its own hue, members as graded shades
+perfam <- generate_palette(fam$assignment, mode = "harmonious",
+  harmonious_style = "per_family", neighbors = fam$neighbors, seed = 1)
+plot_swatches(perfam)
+
+# neighboring compartments: contrasting (default in contrast mode) vs analogous
+generate_palette(fam$assignment, neighbor_hues = "contrast", neighbors = fam$neighbors)$families
+generate_palette(fam$assignment, neighbor_hues = "coherent", neighbors = fam$neighbors)$families
+
+plot_palette_static(pdata, sweep) # ggplot2 object if installed -> auto-prints
 
 # ---- 3b. Pull colors out in whichever shape you actually need -------------
-print(cluster_colors(sess)) # named vector: c(c1 = "#...", c2 = "#...", ...)
-print(cluster_colors(sess, format = "data.frame")) # data frame: cluster, color
-print(family_colors(sess))
+print(cluster_colors(sweep)) # named vector: c(c1 = "#...", c2 = "#...", ...)
+print(cluster_colors(sweep, format = "data.frame")) # cluster/color/family_id/family_color
+print(family_colors(sweep))
 
-# ---- 4. Try contrast mode + a colorblind preview ---------------------------
-sess_contrast <- generate_palette(fam$assignment, mode = "contrast", seed = 1)
+# ---- 4. Contrast mode + a colorblind preview -----------------------------
+sess_contrast <- generate_palette(fam$assignment, mode = "contrast",
+  neighbors = fam$neighbors, seed = 1)
 plot_palette_static(pdata, sess_contrast, cvd = "deutan")
 
+# ---- 4b. Auto lightness + optimize a hand-picked color ------------------
+opt <- set_manual_color(sess_contrast, cluster = "c1", color = "#20304A")
+opt <- set_manual_color(opt, cluster = "c2", color = "#E7D8C1")
+# non-manual colors now regenerate inside the manual picks' L/C envelope:
+opt <- generate_palette(fam$assignment, session = opt, mode = "contrast")
+optimize_color("#7B00FF") # harsh neon violet -> in-envelope violet
+optimize_color("#7B00FF", session = sess_contrast) # matched to this palette
+
 # ---- 5. Manual override survives regeneration + a family move -------------
-sess2 <- set_manual_color(sess, cluster = "c1", color = "#FF00AA")
+sess2 <- set_manual_color(sweep, cluster = "c1", color = "#FF00AA")
 moved <- fam$assignment
 moved$family_id[moved$cluster == "c1"] <- "F3"
 sess3 <- generate_palette(moved, session = sess2, mode = "contrast", seed = 2)

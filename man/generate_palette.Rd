@@ -8,56 +8,82 @@ generate_palette(
   assignment,
   session = NULL,
   mode = c("harmonious", "contrast"),
+  harmonious_style = c("sweep", "per_family"),
+  neighbor_hues = NULL,
+  neighbors = NULL,
   seed = 1,
-  lightness_range = c(35, 85),
-  chroma_range = c(35, 90),
+  lightness_range = "auto",
+  chroma_range = "auto",
   hue_range = c(0, 360),
   cvd = c("none", "deutan", "protan", "tritan"),
   n_cells = NULL
 )
 }
 \arguments{
-\item{assignment}{A data frame with columns \code{cluster}, \code{family_id} (e.g.
-\code{detect_families(pdata)$assignment}, possibly hand-edited).}
+\item{assignment}{A data frame with columns \code{cluster}, \code{family_id}.}
 
-\item{session}{An existing \code{palettome_session} (from a previous call) to
-preserve manual overrides from, or \code{NULL} for a fresh palette.}
+\item{session}{An existing \code{palettome_session} to inherit manual
+overrides from, or \code{NULL}.}
 
 \item{mode}{\code{"harmonious"} or \code{"contrast"}.}
 
-\item{seed}{Random seed (family hue order / contrast candidate pool).}
+\item{harmonious_style}{\code{"sweep"} or \code{"per_family"} (only used when
+\code{mode = "harmonious"}).}
 
-\item{lightness_range, chroma_range}{Two-element numeric ranges in HCL
-space (roughly \verb{[0, 100]}) controlling generated shade/tint/tone.}
+\item{neighbor_hues}{\code{"contrast"}, \code{"coherent"}, or \code{NULL} to follow the
+mode (contrast -> \code{"contrast"}, harmonious -> \code{"coherent"}).}
 
-\item{hue_range}{Two-element numeric range in degrees to draw hues from.}
+\item{neighbors}{Optional neighbor information used to order families and
+clusters in space: a data frame of centroids (\code{cluster} + \verb{*_centroid}
+or coordinate columns, e.g. \code{\link[=compute_centroids]{compute_centroids()}}) or a square
+cluster-by-cluster connectivity/distance matrix. \code{NULL} disables
+neighbor-aware placement (falls back to even hue spacing).}
 
-\item{cvd}{\code{"none"}, or \code{"deutan"}/\code{"protan"}/\code{"tritan"} to bias
-generation towards staying distinguishable under that color-vision
-deficiency.}
+\item{seed}{Random seed.}
 
-\item{n_cells}{Optional named integer vector or data frame with
-\code{cluster}/\code{n_cells} columns, stored on the session for convenience
-(e.g. sizing legend swatches) but not used in color choice.}
+\item{lightness_range, chroma_range}{Length-2 numeric ranges in HCL space,
+or \code{"auto"} (default) to derive them from manual overrides when present
+and from mode/style presets otherwise.}
+
+\item{hue_range}{Length-2 numeric range in degrees to draw hues from.}
+
+\item{cvd}{\code{"none"}, \code{"deutan"}, \code{"protan"}, or \code{"tritan"}.}
+
+\item{n_cells}{Optional named integer vector or \code{cluster}/\code{n_cells} data
+frame, stored on the session for convenience.}
 }
 \value{
-A \code{palettome_session} object (see the package README for the
-full JSON schema): a list with \code{schema_version}, \code{clusters} (data frame:
-\code{cluster}, \code{family_id}, \code{color}, \code{manual_color}, \code{n_cells}), \code{families}
-(data frame: \code{family_id}, \code{color}, \code{manual_color}), and \code{params}.
+A \code{palettome_session} object (see the package README for the JSON
+schema).
 }
 \description{
 The core color-generation entry point. Given a cluster -> family
-assignment, computes one base hue per family and either shades within
-that hue (\code{mode = "harmonious"}) or a maximally-distinguishable color per
-cluster (\code{mode = "contrast"}), with family membership always carried in
-\verb{$families$color} as a secondary channel (a header/tag/outline color).
+assignment, it places one base hue per family and then colors each
+cluster, in one of two modes:
 }
 \details{
+\itemize{
+\item \code{mode = "harmonious"} -- a coordinated palette in HCL space.
+\code{harmonious_style = "sweep"} (default) lays families along a single
+analogous hue arc with a shared monotone lightness ramp and muted
+chroma (a smooth blue -> purple -> rose -> tan style sweep);
+\code{harmonious_style = "per_family"} gives each family its own hue and
+colors its members as graded shades of it.
+\item \code{mode = "contrast"} -- every cluster gets a maximally-distinguishable
+color via greedy max-min selection in Lab space; family membership is
+carried by \verb{$families$color} as a secondary channel.
+}
+
+Neighbor-awareness: when \code{neighbors} is supplied, families that are
+adjacent in the embedding/graph get \strong{contrasting} hues by default
+(\code{neighbor_hues = "contrast"}, the default in contrast mode) or
+\strong{analogous} hues (\code{neighbor_hues = "coherent"}, the default in
+harmonious mode); and within a family, spatially-adjacent clusters are
+given far-apart lightness for local contrast.
+
 Passing a previous \code{session} makes this incremental: any cluster or
-family with \code{manual_color == TRUE} keeps its stored color untouched, and
-the algorithm treats those fixed colors as already "used" so newly
-generated colors avoid clashing with them. This is what lets a UI call
-\code{generate_palette()} again and again (new mode, new seed, edited
-families) without ever clobbering a user's manual picks.
+family with \code{manual_color == TRUE} keeps its color, the generator treats
+those as fixed and avoids clashing with them, and with
+\code{lightness_range}/\code{chroma_range} left at \code{"auto"} the non-manual colors
+are regenerated inside the L/C envelope implied by the manual picks.
 }

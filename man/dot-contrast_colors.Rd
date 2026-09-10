@@ -11,8 +11,7 @@
   chroma_range,
   hue_range = c(0, 360),
   fixed_hex = character(0),
-  cvd = "none",
-  pool_size = 2000
+  cvd = "none"
 )
 }
 \arguments{
@@ -20,28 +19,21 @@
 
 \item{seed}{Random seed for candidate pool generation.}
 
-\item{lightness_range, chroma_range, hue_range}{Ranges to draw candidates
-from.}
+\item{lightness_range, chroma_range, hue_range}{Ranges the candidate pool
+is drawn from.}
 
-\item{fixed_hex}{Character vector of colors already in use (e.g. manual
-overrides); the selection avoids clashing with these but does not
-return them.}
+\item{fixed_hex}{Colors already in use (manual overrides); selection
+avoids clashing with these but does not return them.}
 
-\item{cvd}{\code{"none"} or a CVD type; when set, distances are computed on
-the CVD-simulated candidates so the chosen palette stays distinguishable
-under that deficiency.}
-
-\item{pool_size}{Size of the random candidate pool to search.}
+\item{cvd}{\code{"none"} or a CVD type; distances are then computed on the
+CVD-simulated colors.}
 }
 \value{
 Character vector of \code{n} hex colors.
 }
 \description{
-Builds a large candidate pool of HCL colors and greedily picks the
-candidate that maximizes the minimum perceptual distance to colors
-already chosen (including any fixed/manual colors passed in as a
-starting set), repeated until \code{n} colors are chosen. This is the standard
-approach for maximally-distinguishable qualitative palettes in a
-perceptually uniform space.
+Greedily picks, from a candidate pool, the color that maximizes the
+minimum perceptual distance to colors already chosen (including any
+fixed/manual colors passed in), repeated until \code{n} colors are chosen.
 }
 \keyword{internal}

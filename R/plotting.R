@@ -56,11 +56,22 @@ plot_palette_static <- function(pdata, session, cvd = "none",
 #'
 #' @param session A `palettome_session`.
 #' @param cvd `"none"` or a CVD type to preview the swatches under.
+#' @param order_by `"lightness"` (default) sorts families, and clusters
+#'   within each family, by lightness so a harmonious sweep reads as a
+#'   continuous ramp; `"id"` keeps `family_id` / `cluster` order.
 #' @return Invisibly, `NULL`; draws to the current graphics device.
 #' @export
-plot_swatches <- function(session, cvd = "none") {
+plot_swatches <- function(session, cvd = "none", order_by = c("lightness", "id")) {
   stopifnot(inherits(session, "palettome_session"))
-  clusters <- session$clusters[order(session$clusters$family_id, session$clusters$cluster), ]
+  order_by <- match.arg(order_by)
+  clusters <- session$clusters
+  if (order_by == "lightness") {
+    cl_l <- farver::decode_colour(clusters$color, to = "lab")[, "l"]
+    fam_l <- tapply(cl_l, clusters$family_id, mean)
+    clusters <- clusters[order(fam_l[clusters$family_id], cl_l), ]
+  } else {
+    clusters <- clusters[order(clusters$family_id, clusters$cluster), ]
+  }
   families <- session$families[match(unique(clusters$family_id), session$families$family_id), ]
 
   cluster_col <- clusters$color

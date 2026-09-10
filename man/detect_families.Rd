@@ -37,6 +37,10 @@ A \code{palettome_families} object: a list with
 \item{dendro}{The \code{compute_family_dendrogram()} result, or \code{NULL} if
 \code{method == "explicit"}; kept so a UI can preview/re-cut the
 dendrogram without recomputation.}
+\item{neighbors}{Neighbor information ready to pass to
+\code{\link[=generate_palette]{generate_palette()}} -- the supplied \code{connectivity} matrix if any,
+otherwise the cluster centroids -- so neighbor-aware coloring works
+without recomputing anything.}
 }
 }
 \description{

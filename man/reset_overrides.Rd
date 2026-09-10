@@ -15,8 +15,8 @@ everything.}
 }
 \value{
 The updated \code{palettome_session} (colors are left as-is; only the
-\code{manual_color} flags are cleared — call \code{\link[=generate_palette]{generate_palette()}} again to
-actually recompute the now-unlocked colors).
+\code{manual_color} flags are cleared -- call \code{\link[=generate_palette]{generate_palette()}} again to
+recompute the now-unlocked colors).
 }
 \description{
 Reset manual color overrides
