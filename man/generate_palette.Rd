@@ -9,6 +9,7 @@ generate_palette(
   session = NULL,
   mode = c("harmonious", "contrast"),
   harmonious_style = c("sweep", "per_family"),
+  sweep_anchors = NULL,
   neighbor_hues = NULL,
   neighbors = NULL,
   seed = 1,
@@ -29,6 +30,14 @@ overrides from, or \code{NULL}.}
 
 \item{harmonious_style}{\code{"sweep"} or \code{"per_family"} (only used when
 \code{mode = "harmonious"}).}
+
+\item{sweep_anchors}{Optional character vector of 2+ hex colors (only
+used when \code{mode = "harmonious"} and \code{harmonious_style = "sweep"}): a
+gradient to sweep the palette along, interpolated through in HCL space
+in the order given, instead of the automatically-placed analogous arc.
+Handy when the auto arc's seed-to-seed variety (see \link{generate_palette}
+examples) still isn't the specific look you want -- e.g. brand colors,
+or literally the colors from a reference gradient.}
 
 \item{neighbor_hues}{\code{"contrast"}, \code{"coherent"}, or \code{NULL} to follow the
 mode (contrast -> \code{"contrast"}, harmonious -> \code{"coherent"}).}

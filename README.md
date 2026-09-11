@@ -12,9 +12,12 @@ T cells, subtypes of myeloid cells) can be colored either:
 - **harmonious** — a coordinated palette in a perceptually uniform space.
   `harmonious_style = "sweep"` (default) lays the families along one
   analogous hue arc with a shared monotone lightness ramp and muted chroma
-  (a smooth blue → purple → rose → tan style progression);
-  `harmonious_style = "per_family"` gives each family its own hue and colors
-  its members as graded shades of it.
+  (e.g. a smooth blue → purple → rose → tan progression is just one example
+  — a different `seed` gives a genuinely different arc: green, teal, red,
+  gold, ..., not a small jitter around one fixed look — and `sweep_anchors`
+  lets you specify the exact gradient to sweep through instead of an
+  automatic one); `harmonious_style = "per_family"` gives each family its
+  own hue and colors its members as graded shades of it.
 - **contrast** — every cluster gets a maximally distinguishable color
   (greedy max-min selection in Lab space), with family membership still
   visible through a secondary color channel (the family's own accent/tag
@@ -95,6 +98,7 @@ Key `generate_palette()` arguments:
 |---|---|
 | `mode` | `"harmonious"` or `"contrast"` |
 | `harmonious_style` | `"sweep"` (one analogous multi-hue sweep) or `"per_family"` (one hue per family, shaded) |
+| `sweep_anchors` | (sweep only) 2+ hex colors to interpolate the sweep through, instead of the automatic gradient |
 | `neighbor_hues` | `"contrast"` / `"coherent"`, or `NULL` to follow the mode (contrast→contrast, harmonious→coherent) |
 | `neighbors` | centroids data frame or connectivity matrix; `NULL` disables neighbor-aware placement |
 | `lightness_range`, `chroma_range` | length-2 numeric, or `"auto"` (default): derived from manual picks if any, else from mode/style presets |
@@ -109,6 +113,15 @@ session2 <- generate_palette(fam$assignment, session = session, mode = "contrast
 # with lightness_range/chroma_range = "auto" the rest fit to the manual picks
 
 optimize_color("#7B00FF", session = session2)  # snap a hand-picked hex into the palette envelope
+```
+
+Different seeds give genuinely different sweep gradients (not a small jitter
+around one look), or specify the exact gradient yourself:
+
+```r
+generate_palette(fam$assignment, mode = "harmonious", seed = 7)  # try a few seeds
+generate_palette(fam$assignment, mode = "harmonious",
+  sweep_anchors = c("#0B3D91", "#FF5733", "#FFD166"))            # your own gradient
 ```
 
 `session$clusters`/`session$families` are already plain data frames (see
@@ -163,12 +176,16 @@ family dendrogram, and a drag-and-drop compartment panel: drag a cluster
 chip into a different family bin to regroup it, hit **+ Add compartment** to
 make a new (empty, dashed) bin to drag clusters into, and empty compartments
 are removed automatically. Mode, harmonious style, neighbor-hue rule, seed,
-and a colorblind simulation preview are all live. When the auto light/chroma
-toggle is switched off, the Lightness- and Chroma-range sliders each get a
-swatch strip underneath rendered in the current palette's own hue, dimmed
-outside the selected sub-range -- so the numeric range reads as actual
-colors, not just two numbers. Sessions export as JSON/CSV, and the final
-plot exports as a full-resolution PNG.
+and a colorblind simulation preview are all live. Hit **🎲 Randomize** next
+to the seed for a fresh sweep gradient at a click, or type 2+ comma-
+separated hex colors into **Custom gradient anchors** to sweep through your
+own colors instead of an automatic gradient (a live swatch strip previews
+what you typed). When the auto light/chroma toggle is switched off, the
+Lightness- and Chroma-range sliders each get a swatch strip underneath
+rendered in the current palette's own hue, dimmed outside the selected
+sub-range -- so the numeric range reads as actual colors, not just two
+numbers. Sessions export as JSON/CSV, and the final plot exports as a
+full-resolution PNG.
 
 Click anywhere on a chip or a family's whole color bar (not just its label)
 to open the recolor dialog:
@@ -211,6 +228,7 @@ schema changes.
   "params": {
     "mode": "harmonious",
     "harmonious_style": "sweep",
+    "sweep_anchors": null,
     "neighbor_hues": "coherent",
     "seed": 1,
     "lightness_range": [34, 82],

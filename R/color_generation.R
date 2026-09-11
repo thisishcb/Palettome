@@ -210,31 +210,66 @@ simulate_cvd <- function(hex, type = c("deutan", "protan", "tritan"), severity =
   stats::setNames(out, members)
 }
 
-# Global analogous "sweep": one monotone path through HCL space (rising
-# lightness, an analogous hue arc placed to skip the muddy yellow-green
-# zone, a gentle chroma bulge), cut into contiguous segments assigned to
-# families in spatial order. Within each family segment the path positions
-# are permuted (.spread_slots) so spatially-adjacent clusters land far apart
-# on the segment -> local shade contrast without breaking the global sweep.
+# Piecewise-linear H/L/C path through a sequence of user-supplied anchor
+# colors (decoded to HCL), at positions tt in [0,1]. Hue is unwrapped first
+# so interpolation between consecutive anchors always takes the shorter way
+# around the wheel rather than potentially the long way through 0/360.
+.anchor_path <- function(anchors, tt) {
+  hcl <- .to_hcl(anchors)
+  at <- seq(0, 1, length.out = nrow(hcl))
+  h_unwrapped <- hcl[, "h"]
+  for (i in seq_along(h_unwrapped)[-1]) {
+    h_unwrapped[i] <- h_unwrapped[i - 1] + .circ_signed(h_unwrapped[i], h_unwrapped[i - 1])
+  }
+  list(
+    h = stats::approx(at, h_unwrapped, xout = tt, rule = 2)$y %% 360,
+    l = stats::approx(at, hcl[, "l"], xout = tt, rule = 2)$y,
+    c = stats::approx(at, hcl[, "c"], xout = tt, rule = 2)$y
+  )
+}
+
+# Global analogous "sweep": one monotone path through HCL space, cut into
+# contiguous segments assigned to families in spatial order. Within each
+# family segment the path positions are permuted (.spread_slots) so
+# spatially-adjacent clusters land far apart on the segment -> local shade
+# contrast without breaking the global sweep.
+#
+# By default the path is auto-generated (rising lightness, an analogous hue
+# arc placed to skip the muddy yellow-green zone, a gentle chroma bulge). If
+# `anchors` (2+ hex colors) is supplied, the path instead interpolates
+# through exactly those colors in HCL space -- a user-specified gradient to
+# sweep the palette along, instead of the automatic one.
 #
 # manual_family_hue (named family_id -> hue) lets a manually-recolored
 # family override just the hue channel of its own segment, so its members
 # automatically re-shade around the color the user picked, while keeping
 # the lightness/chroma schedule (and thus the family's place in the global
-# ramp) intact.
+# ramp) intact -- this applies whether the base path is automatic or
+# anchor-driven.
 .harmonious_sweep <- function(ord_fam, member_order, l_range, c_range,
-                               hue_range, seed, manual_family_hue = NULL) {
+                               hue_range, seed, manual_family_hue = NULL,
+                               anchors = NULL) {
   ordered <- unlist(member_order[ord_fam], use.names = FALSE)
   N <- length(ordered)
   empty <- stats::setNames(character(0), character(0))
   if (N == 0) return(list(cluster = empty, family = empty))
 
-  arc <- min(diff(hue_range), if (N <= 4) 85 else if (N <= 9) 120 else 150)
-  start <- .best_arc_start(arc, hue_range, seed)
-  tt <- if (N == 1) 0.5 else (seq_len(N) - 0.5) / N
-  h_path <- (start + tt * arc) %% 360
-  l_path <- l_range[1] + tt * diff(l_range)
-  c_path <- mean(c_range) + (diff(c_range) / 2) * 0.4 * sin(pi * tt)
+  if (length(anchors) >= 2) {
+    # endpoint-inclusive: the first/last cluster should actually land on the
+    # first/last anchor the user gave, not an inset bin-centered position.
+    pos <- if (N == 1) 0.5 else (seq_len(N) - 1) / (N - 1)
+    ap <- .anchor_path(anchors, pos)
+    h_path <- ap$h
+    l_path <- ap$l
+    c_path <- ap$c
+  } else {
+    tt <- if (N == 1) 0.5 else (seq_len(N) - 0.5) / N
+    arc <- min(diff(hue_range), if (N <= 4) 85 else if (N <= 9) 120 else 150)
+    start <- .best_arc_start(arc, hue_range, seed)
+    h_path <- (start + tt * arc) %% 360
+    l_path <- l_range[1] + tt * diff(l_range)
+    c_path <- mean(c_range) + (diff(c_range) / 2) * 0.4 * sin(pi * tt)
+  }
 
   if (length(manual_family_hue)) {
     p <- 0L
@@ -378,6 +413,13 @@ simulate_cvd <- function(hex, type = c("deutan", "protan", "tritan"), severity =
 #' @param mode `"harmonious"` or `"contrast"`.
 #' @param harmonious_style `"sweep"` or `"per_family"` (only used when
 #'   `mode = "harmonious"`).
+#' @param sweep_anchors Optional character vector of 2+ hex colors (only
+#'   used when `mode = "harmonious"` and `harmonious_style = "sweep"`): a
+#'   gradient to sweep the palette along, interpolated through in HCL space
+#'   in the order given, instead of the automatically-placed analogous arc.
+#'   Handy when the auto arc's seed-to-seed variety (see [generate_palette]
+#'   examples) still isn't the specific look you want -- e.g. brand colors,
+#'   or literally the colors from a reference gradient.
 #' @param neighbor_hues `"contrast"`, `"coherent"`, or `NULL` to follow the
 #'   mode (contrast -> `"contrast"`, harmonious -> `"coherent"`).
 #' @param neighbors Optional neighbor information used to order families and
@@ -399,6 +441,7 @@ simulate_cvd <- function(hex, type = c("deutan", "protan", "tritan"), severity =
 generate_palette <- function(assignment, session = NULL,
                               mode = c("harmonious", "contrast"),
                               harmonious_style = c("sweep", "per_family"),
+                              sweep_anchors = NULL,
                               neighbor_hues = NULL,
                               neighbors = NULL,
                               seed = 1,
@@ -416,7 +459,9 @@ generate_palette <- function(assignment, session = NULL,
   neighbor_hues <- match.arg(neighbor_hues, c("contrast", "coherent"))
   stopifnot(
     "`assignment` must have `cluster` and `family_id` columns" =
-      all(c("cluster", "family_id") %in% names(assignment))
+      all(c("cluster", "family_id") %in% names(assignment)),
+    "`sweep_anchors` must have 2 or more hex colors, or be NULL" =
+      is.null(sweep_anchors) || length(sweep_anchors) >= 2
   )
   assignment <- unique(assignment[, c("cluster", "family_id")])
   assignment$cluster <- as.character(assignment$cluster)
@@ -486,7 +531,8 @@ generate_palette <- function(assignment, session = NULL,
 
   if (mode == "harmonious" && harmonious_style == "sweep") {
     sweep <- .harmonious_sweep(
-      ord_fam, member_order, l_range, c_range, hue_range, seed, manual_family_hue
+      ord_fam, member_order, l_range, c_range, hue_range, seed, manual_family_hue,
+      anchors = sweep_anchors
     )
     for (cl in names(sweep$cluster)) {
       if (is.na(cluster_color[cl])) cluster_color[cl] <- sweep$cluster[[cl]]
@@ -539,6 +585,7 @@ generate_palette <- function(assignment, session = NULL,
       params = list(
         mode = mode,
         harmonious_style = harmonious_style,
+        sweep_anchors = sweep_anchors,
         neighbor_hues = neighbor_hues,
         seed = seed,
         lightness_range = l_range,

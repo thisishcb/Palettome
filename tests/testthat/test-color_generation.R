@@ -58,6 +58,37 @@ test_that("harmonious sweep is a monotone-lightness analogous sweep", {
   expect_true(all(cdeg(hcl_of(sess$clusters$color)[, "h"], 88) > 12))
 })
 
+test_that("harmonious sweep gives genuinely different gradients across seeds", {
+  starts <- vapply(1:12, function(s) {
+    sess <- generate_palette(test_assignment(), mode = "harmonious", harmonious_style = "sweep", seed = s)
+    hcl_of(sess$clusters$color[1])[, "h"]
+  }, numeric(1))
+  expect_gt(diff(range(starts)), 60)
+})
+
+test_that("sweep_anchors sweeps through the given colors instead of the auto gradient", {
+  anchors <- c("#123456", "#8844AA", "#FFD27F")
+  a3 <- data.frame(cluster = paste0("c", 1:3), family_id = c("F1", "F2", "F3"))
+  sess <- generate_palette(a3, mode = "harmonious", harmonious_style = "sweep", sweep_anchors = anchors)
+
+  ord <- sess$clusters[order(sess$clusters$family_id), ]
+  # endpoints should land at (or extremely close to) the first/last anchors
+  expect_lt(color_distance(c(ord$color[1], anchors[1]))[1, 2], 3)
+  expect_lt(color_distance(c(ord$color[3], anchors[3]))[1, 2], 3)
+
+  # identical regardless of seed -- the anchors fully determine the path
+  sess2 <- generate_palette(a3, mode = "harmonious", harmonious_style = "sweep",
+    sweep_anchors = anchors, seed = 999)
+  expect_identical(sess$clusters$color, sess2$clusters$color)
+})
+
+test_that("sweep_anchors requires at least 2 colors", {
+  expect_error(
+    generate_palette(test_assignment(), sweep_anchors = "#123456"),
+    "sweep_anchors"
+  )
+})
+
 test_that("per_family harmonious gives each family one hue with a lightness spread", {
   sess <- generate_palette(
     test_assignment(),

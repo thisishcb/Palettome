@@ -57,3 +57,11 @@ test_that(".best_arc_start avoids the muddy zone", {
     expect_lt(mean(pen(arc_hues)), 0.35)
   }
 })
+
+test_that(".best_arc_start actually varies across seeds (not just a small jitter)", {
+  bas <- ct(".best_arc_start")
+  starts <- vapply(1:30, function(s) bas(arc = 130, seed = s), numeric(1))
+  # a real spread of starting hues, not everything clustered in one 30-40deg window
+  expect_gt(diff(range(starts)), 90)
+  expect_gt(length(unique(round(starts / 10))), 5)
+})

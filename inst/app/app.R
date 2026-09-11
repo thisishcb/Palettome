@@ -65,11 +65,20 @@ ui <- fluidPage(
           selected = p0$harmonious_style %||% "sweep"
         )
       ),
+      conditionalPanel(
+        "input.mode == 'harmonious' && input.harmonious_style == 'sweep'",
+        textInput("sweep_anchors_text", "Custom gradient anchors (optional)",
+          value = "", placeholder = "#123456, #8844AA, #FFD27F"),
+        uiOutput("anchors_preview")
+      ),
       selectInput("neighbor_hues", "Neighboring compartments",
         c("auto (by mode)" = "auto", "contrasting hues" = "contrast", "analogous hues" = "coherent"),
         selected = "auto"
       ),
-      numericInput("seed", "Seed", value = p0$seed, min = 1, step = 1),
+      fluidRow(
+        column(7, numericInput("seed", "Seed", value = p0$seed, min = 1, step = 1)),
+        column(5, div(style = "margin-top:25px;", actionButton("randomize_seed", "\U0001F3B2 Randomize")))
+      ),
       checkboxInput("auto_range", "Auto lightness / chroma range", value = TRUE),
       conditionalPanel(
         "!input.auto_range",
@@ -126,20 +135,71 @@ server <- function(input, output, session) {
     if (isTRUE(input$auto_range)) "auto" else input[[which]]
   }
 
-  regenerate <- function() {
+  # Comma-separated hex list -> validated character vector (or NULL if
+  # blank / fewer than 2 valid colors, in which case the sweep falls back
+  # to its automatic gradient).
+  parse_anchors <- function(txt) {
+    if (is.null(txt) || !nzchar(trimws(txt))) return(NULL)
+    parts <- trimws(strsplit(txt, ",")[[1]])
+    parts <- parts[nzchar(parts)]
+    ok <- parts[vapply(parts, function(p) {
+      tryCatch({
+        farver::decode_colour(p)
+        TRUE
+      }, error = function(e) FALSE)
+    }, logical(1))]
+    if (length(ok) < 2) NULL else ok
+  }
+
+  regenerate <- function(seed_override = NULL) {
+    anchors <- if (identical(input$harmonious_style, "sweep")) parse_anchors(input$sweep_anchors_text)
     rv$session <- palettome::generate_palette(
       rv$assignment,
       session = rv$session,
       mode = input$mode,
       harmonious_style = input$harmonious_style %||% "sweep",
+      sweep_anchors = anchors,
       neighbor_hues = neighbor_hues_arg(),
       neighbors = pt_env$neighbors,
-      seed = input$seed,
+      seed = seed_override %||% input$seed,
       lightness_range = range_arg("lightness_range"),
       chroma_range = range_arg("chroma_range"),
       cvd = input$cvd
     )
   }
+
+  output$anchors_preview <- renderUI({
+    raw_text <- trimws(input$sweep_anchors_text %||% "")
+    if (!nzchar(raw_text)) {
+      return(tags$div(
+        style = "font-size:11px; color:#888; margin:-4px 0 8px 0;",
+        "Leave blank for an automatic gradient (or click \U0001F3B2 Randomize for a new one)."
+      ))
+    }
+    anchors <- parse_anchors(raw_text)
+    if (is.null(anchors)) {
+      return(tags$div(
+        style = "font-size:11px; color:#c0392b; margin:-4px 0 8px 0;",
+        "Need 2+ valid hex colors, comma-separated -- e.g. #123456, #8844AA"
+      ))
+    }
+    tags$div(
+      class = "pt-range-preview", style = "margin:-4px 0 8px 0;",
+      lapply(anchors, function(h) tags$div(style = sprintf("background:%s;", h)))
+    )
+  })
+
+  observeEvent(input$randomize_seed, {
+    if (!is.null(parse_anchors(input$sweep_anchors_text))) {
+      showNotification(
+        "Custom gradient anchors are set, so the seed won't change the gradient -- clear them to randomize.",
+        type = "warning", duration = 5
+      )
+    }
+    new_seed <- sample.int(100000, 1)
+    updateNumericInput(session, "seed", value = new_seed)
+    regenerate(new_seed)
+  })
 
   # drop empty families (except a freshly added, still-unused one)
   prune_families <- function() {

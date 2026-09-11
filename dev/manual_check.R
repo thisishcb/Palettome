@@ -36,6 +36,18 @@ sweep <- generate_palette(fam$assignment, mode = "harmonious",
 print(sweep$clusters)
 plot_swatches(sweep) # ordered by lightness -> reads as a ramp
 
+# different seeds give genuinely different gradients, not a small jitter
+# around one look -- try a few:
+for (s in c(2, 5, 8)) {
+  plot_swatches(generate_palette(fam$assignment, mode = "harmonious",
+    harmonious_style = "sweep", neighbors = fam$neighbors, seed = s))
+}
+
+# or specify the exact gradient to sweep through yourself:
+custom <- generate_palette(fam$assignment, mode = "harmonious",
+  sweep_anchors = c("#0B3D91", "#FF5733", "#FFD166"), neighbors = fam$neighbors)
+plot_swatches(custom)
+
 # "per_family": each family its own hue, members as graded shades
 perfam <- generate_palette(fam$assignment, mode = "harmonious",
   harmonious_style = "per_family", neighbors = fam$neighbors, seed = 1)

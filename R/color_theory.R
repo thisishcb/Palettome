@@ -58,30 +58,50 @@
   exp(-0.5 * (.circ_dist(h, 88) / 26)^2)
 }
 
-#' Placement of an analogous hue arc that best avoids the muddy zone
+#' Placement of an analogous hue arc that avoids the muddy zone
 #'
-#' Probes arc start positions across `hue_range`, scores each by the mean
-#' muddiness over the arc it would span, takes the best, and adds a
-#' seed-controlled jitter so repeated seeds still vary. This is why the
-#' harmonious "sweep" reliably runs through rich blues/purples/reds rather
-#' than olive.
+#' Probes arc start positions across `hue_range`, scores each by the *worst*
+#' (not average) muddiness anywhere along the arc it would span -- a mean
+#' score can hide a single genuinely olive stretch, which is exactly the
+#' part of the sweep that tends to land at low lightness where it's most
+#' visible -- then draws the returned start uniformly at random (by seed)
+#' from every position that clears the tolerance, not just the single best
+#' one. This is what keeps the harmonious "sweep" out of olive while still
+#' giving different seeds genuinely different gradients (reds, teals,
+#' greens, blues, purples, ...), rather than every seed converging on a
+#' small jitter around one "optimal" blue-to-pink arc.
 #'
 #' @param arc Arc width in degrees.
 #' @param hue_range Two-element range the start may fall in.
-#' @param seed Seed for the jitter.
+#' @param seed Seed controlling which acceptable start is picked, and the
+#'   jitter applied to it.
 #' @param n_probe Number of start positions to test.
-#' @param jitter Max +/- jitter (degrees) added to the best probe.
+#' @param tolerance Worst-point muddiness (0-1) a start may have and still
+#'   be considered acceptable; widened automatically if nothing clears it.
+#' @param jitter Max +/- continuous jitter (degrees) added after picking a
+#'   probe, so results aren't quantized to the probe grid.
 #' @return A single hue in degrees.
 #' @keywords internal
 .best_arc_start <- function(arc, hue_range = c(0, 360), seed = 1,
-                             n_probe = 48, jitter = 16) {
+                             n_probe = 72, tolerance = 0.25, jitter = 2.5) {
   span <- diff(hue_range)
+  step <- span / n_probe
   probes <- hue_range[1] + seq(0, span, length.out = n_probe + 1)[seq_len(n_probe)]
   mud <- vapply(probes, function(s) {
-    mean(.hue_muddiness_penalty((s + seq(0, arc, length.out = 24)) %% 360))
+    max(.hue_muddiness_penalty((s + seq(0, arc, length.out = 24)) %% 360))
   }, numeric(1))
+
+  tol <- tolerance
+  ok <- probes[mud <= tol]
+  while (length(ok) == 0 && tol < 1) {
+    tol <- tol + 0.1
+    ok <- probes[mud <= tol]
+  }
+  if (length(ok) == 0) ok <- probes[which.min(mud)]
+
   set.seed(seed + 991L)
-  (probes[which.min(mud)] + stats::runif(1, -jitter, jitter)) %% 360
+  pick <- sample(ok, 1)
+  (pick + stats::runif(1, -jitter, jitter)) %% 360
 }
 
 #' Build hex from HCL, clamping chroma into the displayable gamut

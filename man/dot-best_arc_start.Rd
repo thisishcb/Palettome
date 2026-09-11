@@ -2,14 +2,15 @@
 % Please edit documentation in R/color_theory.R
 \name{.best_arc_start}
 \alias{.best_arc_start}
-\title{Placement of an analogous hue arc that best avoids the muddy zone}
+\title{Placement of an analogous hue arc that avoids the muddy zone}
 \usage{
 .best_arc_start(
   arc,
   hue_range = c(0, 360),
   seed = 1,
-  n_probe = 48,
-  jitter = 16
+  n_probe = 72,
+  tolerance = 0.25,
+  jitter = 2.5
 )
 }
 \arguments{
@@ -17,20 +18,30 @@
 
 \item{hue_range}{Two-element range the start may fall in.}
 
-\item{seed}{Seed for the jitter.}
+\item{seed}{Seed controlling which acceptable start is picked, and the
+jitter applied to it.}
 
 \item{n_probe}{Number of start positions to test.}
 
-\item{jitter}{Max +/- jitter (degrees) added to the best probe.}
+\item{tolerance}{Worst-point muddiness (0-1) a start may have and still
+be considered acceptable; widened automatically if nothing clears it.}
+
+\item{jitter}{Max +/- continuous jitter (degrees) added after picking a
+probe, so results aren't quantized to the probe grid.}
 }
 \value{
 A single hue in degrees.
 }
 \description{
-Probes arc start positions across \code{hue_range}, scores each by the mean
-muddiness over the arc it would span, takes the best, and adds a
-seed-controlled jitter so repeated seeds still vary. This is why the
-harmonious "sweep" reliably runs through rich blues/purples/reds rather
-than olive.
+Probes arc start positions across \code{hue_range}, scores each by the \emph{worst}
+(not average) muddiness anywhere along the arc it would span -- a mean
+score can hide a single genuinely olive stretch, which is exactly the
+part of the sweep that tends to land at low lightness where it's most
+visible -- then draws the returned start uniformly at random (by seed)
+from every position that clears the tolerance, not just the single best
+one. This is what keeps the harmonious "sweep" out of olive while still
+giving different seeds genuinely different gradients (reds, teals,
+greens, blues, purples, ...), rather than every seed converging on a
+small jitter around one "optimal" blue-to-pink arc.
 }
 \keyword{internal}
