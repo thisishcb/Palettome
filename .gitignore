@@ -9,6 +9,10 @@
 inst/doc/
 Rplots.pdf
 
+# Local example/real data caches (see dev/seurat_cache.R) -- large and/or
+# real sample data, never committed.
+dev/data/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
