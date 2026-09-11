@@ -163,7 +163,8 @@ server <- function(input, output, session) {
       type = "scattergl", mode = "markers", marker = list(size = 4, opacity = 0.7)
     ) %>%
       plotly::layout(
-        xaxis = list(title = pd$coord_cols[1]), yaxis = list(title = pd$coord_cols[2]),
+        xaxis = list(title = pd$coord_cols[1]),
+        yaxis = list(title = pd$coord_cols[2], scaleanchor = "x", scaleratio = 1),
         legend = list(itemsizing = "constant")
       )
   })
