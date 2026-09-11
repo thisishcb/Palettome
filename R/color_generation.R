@@ -216,8 +216,14 @@ simulate_cvd <- function(hex, type = c("deutan", "protan", "tritan"), severity =
 # families in spatial order. Within each family segment the path positions
 # are permuted (.spread_slots) so spatially-adjacent clusters land far apart
 # on the segment -> local shade contrast without breaking the global sweep.
+#
+# manual_family_hue (named family_id -> hue) lets a manually-recolored
+# family override just the hue channel of its own segment, so its members
+# automatically re-shade around the color the user picked, while keeping
+# the lightness/chroma schedule (and thus the family's place in the global
+# ramp) intact.
 .harmonious_sweep <- function(ord_fam, member_order, l_range, c_range,
-                               hue_range, seed) {
+                               hue_range, seed, manual_family_hue = NULL) {
   ordered <- unlist(member_order[ord_fam], use.names = FALSE)
   N <- length(ordered)
   empty <- stats::setNames(character(0), character(0))
@@ -229,6 +235,15 @@ simulate_cvd <- function(hex, type = c("deutan", "protan", "tritan"), severity =
   h_path <- (start + tt * arc) %% 360
   l_path <- l_range[1] + tt * diff(l_range)
   c_path <- mean(c_range) + (diff(c_range) / 2) * 0.4 * sin(pi * tt)
+
+  if (length(manual_family_hue)) {
+    p <- 0L
+    for (fid in ord_fam) {
+      m <- length(member_order[[fid]])
+      if (fid %in% names(manual_family_hue)) h_path[p + seq_len(m)] <- manual_family_hue[[fid]]
+      p <- p + m
+    }
+  }
   path <- .hcl_hex(h_path, c_path, l_path)
 
   cluster_col <- stats::setNames(rep(NA_character_, N), ordered)
@@ -471,7 +486,7 @@ generate_palette <- function(assignment, session = NULL,
 
   if (mode == "harmonious" && harmonious_style == "sweep") {
     sweep <- .harmonious_sweep(
-      ord_fam, member_order, l_range, c_range, hue_range, seed
+      ord_fam, member_order, l_range, c_range, hue_range, seed, manual_family_hue
     )
     for (cl in names(sweep$cluster)) {
       if (is.na(cluster_color[cl])) cluster_color[cl] <- sweep$cluster[[cl]]

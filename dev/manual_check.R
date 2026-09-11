@@ -73,6 +73,13 @@ sess3 <- generate_palette(moved, session = sess2, mode = "contrast", seed = 2)
 stopifnot(sess3$clusters$color[sess3$clusters$cluster == "c1"] == "#FF00AA")
 cat("OK: manual override on c1 survived mode switch + family move\n")
 
+# ---- 5b. Recoloring a family reshades its members around the new hue ------
+recolored <- set_manual_color(sweep, family = "F1", color = "#00CC66")
+recolored <- generate_palette(fam$assignment, session = recolored, mode = "harmonious",
+  harmonious_style = "sweep", neighbors = fam$neighbors, seed = 1)
+print(recolored$clusters[recolored$clusters$family_id == "F1", c("cluster", "color")])
+cat("^ F1's members should now all read as shades of green\n")
+
 # ---- 6. Export round-trip --------------------------------------------------
 tmp <- tempfile(fileext = ".json")
 export_palette_json(sess3, tmp)

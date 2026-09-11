@@ -215,15 +215,81 @@ server <- function(input, output, session) {
     tagList(bins)
   })
 
+  # Tracks the last hex value either side of the hex<->HSL-slider sync
+  # agreed on, so updating one side doesn't bounce back and forth with the
+  # other (see the two observers below).
+  last_hex <- reactiveVal(NULL)
+
   recolor_modal <- function(title, current) {
+    hsl0 <- farver::decode_colour(current, to = "hsl")[1, ]
+    last_hex(toupper(current))
     showModal(modalDialog(
       title = title,
-      colourpicker::colourInput("picked_color", "Color", value = current),
+      colourpicker::colourInput("picked_color", "Color (hex / swatch)", value = current),
+      tags$div(
+        style = "margin-top:8px; padding-top:6px; border-top:1px solid #eee;",
+        tags$b("Raw HSL controls"), tags$span(
+          " -- edit directly; this can produce colors the generator would never pick.",
+          style = "color:#888; font-size:11px;"
+        ),
+        sliderInput("hsl_h", "Hue", min = 0, max = 360, value = round(hsl0[["h"]]), step = 1),
+        sliderInput("hsl_s", "Saturation (%)", min = 0, max = 100, value = round(hsl0[["s"]]), step = 1),
+        sliderInput("hsl_l", "Lightness (%)", min = 0, max = 100, value = round(hsl0[["l"]]), step = 1)
+      ),
+      uiOutput("color_diag"),
       div(style = "margin-top:6px;",
         actionButton("optimize_pick", "Optimize (snap L/C to palette)")),
       footer = tagList(modalButton("Cancel"), actionButton("apply_color", "Apply"))
     ))
   }
+
+  # decode defensively: a hand-typed hex box can be momentarily invalid/
+  # incomplete, and this must never take the reactive graph down with it.
+  safe_decode <- function(hex, to) tryCatch(farver::decode_colour(hex, to = to)[1, ], error = function(e) NULL)
+
+  # hex box (or Optimize) changed -> reflect it in the HSL sliders
+  observeEvent(input$picked_color, {
+    req(input$picked_color)
+    cur <- toupper(input$picked_color)
+    if (identical(cur, isolate(last_hex()))) return()
+    hsl <- safe_decode(cur, "hsl")
+    req(hsl)
+    last_hex(cur)
+    updateSliderInput(session, "hsl_h", value = round(hsl[["h"]]))
+    updateSliderInput(session, "hsl_s", value = round(hsl[["s"]]))
+    updateSliderInput(session, "hsl_l", value = round(hsl[["l"]]))
+  }, ignoreInit = TRUE)
+
+  # HSL sliders changed -> push the resulting hex into the color box
+  observeEvent(list(input$hsl_h, input$hsl_s, input$hsl_l), {
+    req(!is.null(input$hsl_h), !is.null(input$hsl_s), !is.null(input$hsl_l))
+    hex <- toupper(farver::encode_colour(
+      matrix(c(input$hsl_h, input$hsl_s, input$hsl_l), ncol = 3), from = "hsl"
+    ))
+    if (identical(hex, isolate(last_hex()))) return()
+    last_hex(hex)
+    colourpicker::updateColourInput(session, "picked_color", value = hex)
+  }, ignoreInit = TRUE)
+
+  # Live readout of both the raw HSL you're editing in and the perceptual
+  # HCL space the generator itself reasons in, for whatever color is
+  # currently in the dialog (program-picked or hand-edited).
+  output$color_diag <- renderUI({
+    req(input$picked_color)
+    hsl <- safe_decode(input$picked_color, "hsl")
+    hcl <- safe_decode(input$picked_color, "hcl")
+    req(hsl, hcl)
+    tags$div(
+      style = "margin-top:8px; padding-top:6px; border-top:1px solid #eee; font-size:12px; color:#555;",
+      tags$div(sprintf(
+        "HSL: H %.0f°  S %.0f%%  L %.0f%%", hsl[["h"]], hsl[["s"]], hsl[["l"]]
+      )),
+      tags$div(sprintf(
+        "Program's HCL (perceptual) space: H %.0f°  C %.1f  L %.1f",
+        hcl[["h"]], hcl[["c"]], hcl[["l"]]
+      ))
+    )
+  })
 
   observeEvent(input$chip_click, {
     rv$selected <- list(type = "cluster", id = input$chip_click)
@@ -249,6 +315,9 @@ server <- function(input, output, session) {
       rv$session <- palettome::set_manual_color(rv$session, cluster = rv$selected$id, color = input$picked_color)
     } else {
       rv$session <- palettome::set_manual_color(rv$session, family = rv$selected$id, color = input$picked_color)
+      # a family's color stands in for its whole hue: re-derive its
+      # non-manual members' shades around the new color immediately.
+      regenerate()
     }
     removeModal()
   })

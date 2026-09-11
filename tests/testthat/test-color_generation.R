@@ -115,6 +115,23 @@ test_that("lightness_range = \"auto\" fits non-manual colors to the manual picks
   expect_true(all(auto_l >= min(man_l) - 2 & auto_l <= max(man_l) + 2))
 })
 
+test_that("manually recoloring a family reshades its non-manual members around the new hue", {
+  a <- data.frame(cluster = paste0("c", 1:9), family_id = rep(c("F1", "F2", "F3"), each = 3))
+  green_hue <- hcl_of("#00CC66")[, "h"]
+
+  for (style in c("sweep", "per_family")) {
+    sess <- generate_palette(a, mode = "harmonious", harmonious_style = style, seed = 1)
+    sess <- set_manual_color(sess, family = "F2", color = "#00CC66")
+    sess2 <- generate_palette(a, session = sess, mode = "harmonious", harmonious_style = style, seed = 1)
+
+    f2_hue <- hcl_of(sess2$clusters$color[sess2$clusters$family_id == "F2"])[, "h"]
+    expect_true(all(cdeg(f2_hue, green_hue) < 15), info = style)
+    # other families' clusters remain distinct from each other (not all green)
+    other_hue <- hcl_of(sess2$clusters$color[sess2$clusters$family_id != "F2"])[, "h"]
+    expect_true(all(cdeg(other_hue, green_hue) > 15), info = style)
+  }
+})
+
 test_that("explicit numeric ranges are still honored", {
   sess <- generate_palette(test_assignment(), mode = "contrast",
     lightness_range = c(40, 60), chroma_range = c(30, 45), seed = 1)

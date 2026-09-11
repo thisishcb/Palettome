@@ -157,16 +157,34 @@ launch_palettome_ui(pdata)                    # auto-detects families
 launch_palettome_ui(pdata, session = session) # resume a saved session
 ```
 
-The app shows a WebGL (`plotly` `scattergl`) scatter plot of the embedding,
-a family dendrogram, and a drag-and-drop compartment panel: drag a cluster
+The app shows a WebGL (`plotly` `scattergl`) scatter plot of the embedding
+(fixed 1:1 x/y aspect ratio, so distances aren't visually distorted), a
+family dendrogram, and a drag-and-drop compartment panel: drag a cluster
 chip into a different family bin to regroup it, hit **+ Add compartment** to
 make a new (empty, dashed) bin to drag clusters into, and empty compartments
-are removed automatically. Click a chip or family header to open a color
-picker (with an **Optimize** button that snaps the pick into the palette's
-envelope). Mode, harmonious style, neighbor-hue rule, seed, an auto /
-manual light-chroma toggle, and a colorblind simulation preview are all
-live. Sessions export as JSON/CSV, and the final plot exports as a
+are removed automatically. Mode, harmonious style, neighbor-hue rule, seed,
+an auto / manual light-chroma toggle, and a colorblind simulation preview
+are all live. Sessions export as JSON/CSV, and the final plot exports as a
 full-resolution PNG.
+
+Click a chip or family header to open the recolor dialog:
+
+- The hex/swatch picker and three **raw HSL sliders** (Hue/Saturation/
+  Lightness -- the everyday color-picker model, distinct from the HCL space
+  the generator itself reasons in) both edit the same color and stay in
+  sync either direction; nothing stops you from picking a color the
+  generator would never have chosen -- that's the point of exposing raw
+  controls, and the algorithm won't fight you on it.
+- A live readout underneath always shows both the color's raw HSL and its
+  perceptual HCL (hue/chroma/lightness) breakdown, so you can see the
+  actual parameters behind whatever's currently in the box, program-picked
+  or hand-edited.
+- **Optimize** snaps the current color's lightness/chroma into the
+  palette's envelope while keeping its hue (calls `optimize_color()`).
+- Recoloring a **family** immediately reshades its non-manual member
+  clusters around the new hue (in both harmonious styles) -- pick a family's
+  color and its subclusters update automatically, rather than needing a
+  separate "Regenerate colors" click.
 
 ## The JSON schema (stable contract)
 
