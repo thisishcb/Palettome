@@ -163,11 +163,15 @@ family dendrogram, and a drag-and-drop compartment panel: drag a cluster
 chip into a different family bin to regroup it, hit **+ Add compartment** to
 make a new (empty, dashed) bin to drag clusters into, and empty compartments
 are removed automatically. Mode, harmonious style, neighbor-hue rule, seed,
-an auto / manual light-chroma toggle, and a colorblind simulation preview
-are all live. Sessions export as JSON/CSV, and the final plot exports as a
-full-resolution PNG.
+and a colorblind simulation preview are all live. When the auto light/chroma
+toggle is switched off, the Lightness- and Chroma-range sliders each get a
+swatch strip underneath rendered in the current palette's own hue, dimmed
+outside the selected sub-range -- so the numeric range reads as actual
+colors, not just two numbers. Sessions export as JSON/CSV, and the final
+plot exports as a full-resolution PNG.
 
-Click a chip or family header to open the recolor dialog:
+Click anywhere on a chip or a family's whole color bar (not just its label)
+to open the recolor dialog:
 
 - The hex/swatch picker and three **raw HSL sliders** (Hue/Saturation/
   Lightness -- the everyday color-picker model, distinct from the HCL space

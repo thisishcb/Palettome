@@ -43,6 +43,8 @@ pt_css <- "
 .pt-family-header { font-weight: bold; padding: 4px 8px; border-radius: 4px; margin-bottom: 4px; cursor: pointer; color: #fff; text-shadow: 0 0 2px rgba(0,0,0,.6); display: flex; justify-content: space-between; }
 .pt-del { cursor: pointer; opacity: .75; font-weight: normal; }
 .pt-chip { display: inline-block; padding: 3px 8px; margin: 2px; border-radius: 4px; cursor: grab; color: #fff; text-shadow: 0 0 2px rgba(0,0,0,.6); font-size: 12px; }
+.pt-range-preview { display: flex; height: 14px; margin: -6px 0 12px 0; border-radius: 3px; overflow: hidden; border: 1px solid rgba(0,0,0,.08); }
+.pt-range-preview > div { flex: 1; }
 "
 
 n_clusters <- length(unique(pt_env$assignment$cluster))
@@ -73,8 +75,10 @@ ui <- fluidPage(
         "!input.auto_range",
         sliderInput("lightness_range", "Lightness range", min = 0, max = 100,
           value = p0$lightness_range),
+        uiOutput("lightness_preview"),
         sliderInput("chroma_range", "Chroma range", min = 0, max = 100,
-          value = p0$chroma_range)
+          value = p0$chroma_range),
+        uiOutput("chroma_preview")
       ),
       selectInput("cvd", "Colorblind-safe preview", c("none", "deutan", "protan", "tritan")),
       tags$hr(),
@@ -150,6 +154,46 @@ server <- function(input, output, session) {
     palettome::downsample_stratified(pt_env$pdata, max_n = pt_env$preview_max_n)
   })
 
+  # A representative hue for the range-preview strips below: the current
+  # palette's own first family color, so "what colors am I choosing"
+  # reflects this session rather than an arbitrary reference hue.
+  representative_hue <- reactive({
+    tryCatch(
+      farver::decode_colour(rv$session$families$color[1], to = "hcl")[1, "h"],
+      error = function(e) 250
+    )
+  })
+
+  # A strip of swatches spanning the full 0-100 axis of `range_vals`'s
+  # slider, dimmed outside the currently-selected sub-range, so the numeric
+  # Lightness/Chroma sliders show what they actually mean in color.
+  range_preview <- function(kind, range_vals, hue) {
+    vals <- seq(0, 100, length.out = 25)
+    cols <- if (kind == "L") {
+      # clamp chroma to what's actually displayable at each lightness, or
+      # extreme L (near black/white) fixup-clips into odd off-hue colors
+      mc <- colorspace::max_chroma(h = hue, l = pmin(pmax(vals, 1), 99))
+      colorspace::hex(colorspace::polarLUV(L = vals, C = pmin(42, mc * 0.95), H = hue), fixup = TRUE)
+    } else {
+      mc <- colorspace::max_chroma(h = hue, l = 55)
+      colorspace::hex(colorspace::polarLUV(L = 55, C = pmin(vals, mc * 0.95), H = hue), fixup = TRUE)
+    }
+    swatches <- Map(function(v, col) {
+      dim <- v < range_vals[1] || v > range_vals[2]
+      tags$div(style = sprintf("background:%s; opacity:%s;", col, if (dim) "0.2" else "1"))
+    }, vals, cols)
+    tags$div(class = "pt-range-preview", swatches)
+  }
+
+  output$lightness_preview <- renderUI({
+    req(input$lightness_range)
+    range_preview("L", input$lightness_range, representative_hue())
+  })
+  output$chroma_preview <- renderUI({
+    req(input$chroma_range)
+    range_preview("C", input$chroma_range, representative_hue())
+  })
+
   output$scatter <- renderPlotly({
     pd <- preview_data()
     color_map <- stats::setNames(rv$session$clusters$color, rv$session$clusters$cluster)
@@ -197,16 +241,21 @@ server <- function(input, output, session) {
       })
       hdr_bg <- hexor(fam_color[fid])
       del <- if (length(members) == 0) {
+        # stopPropagation so deleting an empty bin doesn't also open the
+        # recolor dialog for it (the whole header bar is now the click
+        # target for that).
         tags$span(class = "pt-del", HTML("&times;"),
-          onclick = sprintf("Shiny.setInputValue('family_del', '%s', {priority: 'event'})", fid))
+          onclick = sprintf(
+            "event.stopPropagation(); Shiny.setInputValue('family_del', '%s', {priority: 'event'})", fid
+          ))
       }
       tags$div(
         class = paste("pt-family-bin", if (length(members) == 0) "pt-empty"),
         `data-family` = fid,
         tags$div(
           class = "pt-family-header", style = sprintf("background:%s;", hdr_bg),
-          tags$span(fid,
-            onclick = sprintf("Shiny.setInputValue('family_click', '%s', {priority: 'event'})", fid)),
+          onclick = sprintf("Shiny.setInputValue('family_click', '%s', {priority: 'event'})", fid),
+          tags$span(fid),
           del
         ),
         chips
