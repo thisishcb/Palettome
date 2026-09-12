@@ -43,4 +43,5 @@ load_seurat_cache <- function(name) {
 # Every session after that -- no Seurat object or `Seurat` package needed:
 #   source("dev/seurat_cache.R")
 #   pdata <- load_seurat_cache("Palette_merged_all_cells")
-#   pdata <- load_seurat_cache("Palette_merged_all_cells")
+#   pdata <- load_seurat_cache("Palette_rough_selected_bcells")
+
