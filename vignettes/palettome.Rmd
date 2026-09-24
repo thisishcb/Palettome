@@ -98,12 +98,35 @@ what keeps recoloring cheap on large datasets:
 compute_centroids(pdata)
 ```
 
-If your data is a Seurat object, replace step 1 with the Seurat method and
-everything downstream is unchanged:
+### The same step with a Seurat object
+
+`as_cluster_data()` has a `Seurat` method, so you do not have to pull out
+embeddings and metadata yourself. Step 1 is the only step that differs —
+everything downstream sees the same `palettome_data` structure either way.
+
+The chunk below is not run when the vignette builds (it needs a real Seurat
+object), but it is the whole substitution:
 
 ```{r seurat, eval = FALSE}
-pdata <- as_cluster_data(seurat_obj, reduction = "umap", dims = 1:2,
-                         cluster_col = "seurat_clusters")
+# --- replaces the as_cluster_data() call above ---------------------------
+# pdata <- as_cluster_data(
+#   seurat_obj,
+#   reduction   = "umap",            # any reduction name (Seurat::Embeddings())
+#   dims        = 1:2,               # or 1:3 for a 3D embedding
+#   cluster_col = "seurat_clusters", # any column of seurat_obj[[]]
+#   family_col  = NULL               # optional: metadata column with an
+#                                    # explicit compartment/family label
+# )
+#
+# --- from here on, identical to the data-frame path ----------------------
+# fam     <- detect_families(pdata, k = 3)
+# session <- generate_palette(fam$assignment, mode = "harmonious",
+#                             neighbors = fam$neighbors, seed = 1)
+#
+# --- and hand the colors straight back to Seurat's own plotting ----------
+# Seurat::DimPlot(seurat_obj, reduction = "umap",
+#                 group.by = "seurat_clusters",
+#                 cols = cluster_colors(session))
 ```
 
 ## Step 2: detect families
@@ -317,6 +340,11 @@ Seurat::DimPlot(seurat_obj, cols = cluster_colors(session))
 ggplot2::ggplot(cells, ggplot2::aes(UMAP_1, UMAP_2, color = cluster)) +
   ggplot2::geom_point() +
   ggplot2::scale_color_manual(values = cluster_colors(session))
+```
+
+Or, if the copy-paste ready named vector is prefered:
+```{r color-hard-code, eval=FALSE}
+cluster_colors(session) |> dput()
 ```
 
 The `"data.frame"` format also merges in each cluster's family id and the
