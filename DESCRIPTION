@@ -1,0 +1,40 @@
+Package: palettome
+Title: Hierarchy-Aware, Interactively Editable Color Palettes for Clusters
+Version: 0.1.0
+Authors@R: person("Chenbin", "Huang", email = "nigel.huang.chb@gmail.com", role = c("aut", "cre"))
+Description: Assigns perceptually-informed color palettes to clustered data
+    (e.g. scRNA-seq clusters / cell subtypes from Seurat or plain UMAP
+    coordinate tables), where clusters that belong to the same "family"
+    (e.g. subtypes of T cells) can be colored either harmoniously (shared
+    hue, varying shade) or with maximal contrast (with family membership
+    encoded via a secondary channel). Families can be auto-detected from
+    embedding-space hierarchical clustering or supplied explicitly, and
+    every generated color remains individually overridable, with manual
+    overrides preserved across regeneration. Core algorithms have no UI
+    dependencies; an optional interactive Shiny UI is provided separately.
+License: Apache License (>= 2.0)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Depends:
+    R (>= 4.1.0)
+Imports:
+    colorspace,
+    farver,
+    stats,
+    graphics,
+    methods,
+    utils,
+    jsonlite
+Suggests:
+    testthat (>= 3.0.0),
+    ggplot2,
+    Seurat,
+    shiny,
+    plotly,
+    colourpicker,
+    shinyjs,
+    dendextend
+Config/testthat/edition: 3
+URL: https://github.com/ChenbinHuang/Palettome
+BugReports: https://github.com/ChenbinHuang/Palettome/issues
