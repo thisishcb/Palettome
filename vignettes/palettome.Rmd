@@ -1,0 +1,378 @@
+---
+title: "Getting started with palettome"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with palettome}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  dpi = 96
+)
+```
+
+```{r setup}
+library(palettome)
+```
+
+## What this package is for
+
+When you plot clustered data — scRNA-seq clusters, cell subtypes, any
+labelled embedding — the default categorical palette treats every cluster as
+unrelated. But clusters usually *are* related: several T-cell subtypes belong
+to one compartment, several myeloid subtypes to another. `palettome` assigns
+colors that encode that structure, while keeping every individual color
+overridable by hand.
+
+The workflow is four steps:
+
+1. `as_cluster_data()` — normalize a data frame (or a Seurat object) into a
+   common structure.
+2. `detect_families()` — group clusters into families, automatically or from
+   a column you supply.
+3. `generate_palette()` — produce the colors.
+4. `cluster_colors()` / `plot_*()` / `export_*()` — use them.
+
+Everything below runs with no UI packages installed; the interactive Shiny
+app (`launch_palettome_ui()`) is entirely optional.
+
+## Example data
+
+The vignette uses a small synthetic embedding so it builds anywhere: three
+compartments, each with a few subclusters scattered around it.
+
+```{r example-data}
+set.seed(42)
+
+compartments <- list(
+  T     = list(center = c(-5,  4), subclusters = c("T_naive", "T_mem", "T_reg", "T_cyto")),
+  Mono  = list(center = c( 6,  2), subclusters = c("Mono_cl", "Mono_nc", "Mac")),
+  B     = list(center = c( 0, -6), subclusters = c("B_naive", "B_mem", "Plasma"))
+)
+
+cells <- do.call(rbind, lapply(names(compartments), function(comp) {
+  info <- compartments[[comp]]
+  do.call(rbind, lapply(info$subclusters, function(cl) {
+    offset <- stats::rnorm(2, sd = 1.6)
+    n <- sample(150:400, 1)
+    data.frame(
+      UMAP_1  = stats::rnorm(n, info$center[1] + offset[1], 0.7),
+      UMAP_2  = stats::rnorm(n, info$center[2] + offset[2], 0.7),
+      cluster = cl,
+      compartment = comp,
+      stringsAsFactors = FALSE
+    )
+  }))
+}))
+
+str(cells)
+```
+
+## Step 1: build a `palettome_data` object
+
+`as_cluster_data()` is the single entry point. Give it the coordinate columns
+and the cluster column:
+
+```{r as-cluster-data}
+pdata <- as_cluster_data(
+  cells,
+  coord_cols  = c("UMAP_1", "UMAP_2"),
+  cluster_col = "cluster"
+)
+
+pdata$coord_cols
+pdata$has_family
+```
+
+`compute_centroids()` gives the per-cluster summary that the rest of the
+package works from — one row per cluster rather than one per cell, which is
+what keeps recoloring cheap on large datasets:
+
+```{r centroids}
+compute_centroids(pdata)
+```
+
+If your data is a Seurat object, replace step 1 with the Seurat method and
+everything downstream is unchanged:
+
+```{r seurat, eval = FALSE}
+pdata <- as_cluster_data(seurat_obj, reduction = "umap", dims = 1:2,
+                         cluster_col = "seurat_clusters")
+```
+
+## Step 2: detect families
+
+With no family column present, families are found by hierarchical clustering
+of the cluster centroids. `k` sets how many families to cut the tree into:
+
+```{r detect-families}
+fam <- detect_families(pdata, k = 3)
+fam$method
+fam$assignment
+```
+
+The dendrogram is kept on the result, so you can preview the tree and re-cut
+it at a different `k` without recomputing distances:
+
+```{r dendrogram}
+plot_dendrogram(fam$dendro, k = 3)
+```
+
+```{r recut}
+cut_families(fam$dendro, k = 5)
+```
+
+If you already know the compartments, pass the column instead and no
+clustering happens at all — `method` becomes `"explicit"`:
+
+```{r explicit-families}
+pdata_explicit <- as_cluster_data(
+  cells,
+  coord_cols  = c("UMAP_1", "UMAP_2"),
+  cluster_col = "cluster",
+  family_col  = "compartment"
+)
+fam_explicit <- detect_families(pdata_explicit)
+fam_explicit$method
+head(fam_explicit$assignment)
+```
+
+Either way, `fam$assignment` is a plain `cluster`/`family_id` data frame you
+are free to edit by hand before generating colors.
+
+## Step 3: generate a palette
+
+### Harmonious mode
+
+The default. Families are laid along a single analogous hue arc with a shared
+lightness ramp and muted chroma, so the whole palette reads as one coordinated
+sweep rather than a bag of unrelated hues.
+
+Passing `fam$neighbors` (the centroids, or a connectivity matrix if you
+supplied one) is what makes the placement spatially aware: families adjacent
+in the embedding are separated, and within a family, adjacent clusters get
+far-apart shades.
+
+```{r harmonious}
+session <- generate_palette(
+  fam$assignment,
+  mode       = "harmonious",
+  neighbors  = fam$neighbors,
+  seed       = 1
+)
+
+cluster_colors(session)
+```
+
+```{r harmonious-plot}
+plot_palette_static(pdata, session)
+```
+
+```{r harmonious-swatches, fig.height = 4}
+plot_swatches(session)
+```
+
+### Contrast mode
+
+Every cluster instead gets a maximally distinguishable color, chosen by
+greedy max-min selection in Lab space. Family membership is still available,
+carried by the family's own accent color in `session$families`:
+
+```{r contrast}
+session_contrast <- generate_palette(
+  fam$assignment,
+  mode      = "contrast",
+  neighbors = fam$neighbors,
+  seed      = 1
+)
+
+family_colors(session_contrast)
+```
+
+```{r contrast-swatches, fig.height = 4}
+plot_swatches(session_contrast)
+```
+
+### Steering the look
+
+Different seeds give genuinely different sweeps — a different hue arc
+altogether, not a jitter around one look:
+
+```{r seeds, fig.height = 4}
+for (s in c(3, 11)) {
+  plot_swatches(generate_palette(fam$assignment, mode = "harmonious",
+                                 neighbors = fam$neighbors, seed = s))
+}
+```
+
+If you want a specific gradient — brand colors, or a reference ramp — give the
+anchors explicitly with `sweep_anchors` and the sweep interpolates through
+them in HCL space:
+
+```{r sweep-anchors, fig.height = 4}
+session_anchored <- generate_palette(
+  fam$assignment,
+  mode          = "harmonious",
+  sweep_anchors = c("#0B3D91", "#FF5733", "#FFD166"),
+  neighbors     = fam$neighbors
+)
+plot_swatches(session_anchored)
+```
+
+`harmonious_style = "per_family"` switches to the older look: one hue per
+family, members as graded shades of it.
+
+```{r per-family, fig.height = 4}
+plot_swatches(generate_palette(fam$assignment, mode = "harmonious",
+                               harmonious_style = "per_family",
+                               neighbors = fam$neighbors, seed = 1))
+```
+
+## Step 4: manual overrides
+
+Any cluster or family color can be replaced by hand. The override is marked
+with `manual_color = TRUE` and survives regeneration — a new mode, a new seed,
+or an edited family assignment — until you reset it explicitly.
+
+```{r manual}
+session <- set_manual_color(session, cluster = "Plasma", color = "#2E5A87")
+session$clusters[session$clusters$manual_color, c("cluster", "color", "manual_color")]
+```
+
+Regenerating now keeps that pick fixed and, because `lightness_range` and
+`chroma_range` are `"auto"`, refits the remaining colors into the
+lightness/chroma envelope your pick implies:
+
+```{r regenerate}
+session2 <- generate_palette(
+  fam$assignment,
+  session   = session,
+  mode      = "contrast",
+  neighbors = fam$neighbors
+)
+cluster_colors(session2)[["Plasma"]]
+```
+
+Families can be overridden the same way. `set_manual_color()` itself only
+records the pick; regenerating then reshades that family's non-manual member
+clusters around the new hue:
+
+```{r manual-family}
+session2 <- set_manual_color(session2, family = "F1", color = "#7A4E9E")
+session2 <- generate_palette(fam$assignment, session = session2,
+                             mode = "harmonious", neighbors = fam$neighbors)
+
+family_colors(session2)
+cluster_colors(session2, format = "data.frame")
+```
+
+`optimize_color()` snaps an arbitrary hand-picked hex to the nearest in-gamut,
+aesthetically tuned lightness/chroma for its hue — useful when a raw pick is
+too neon or too muddy for the surrounding palette:
+
+```{r optimize}
+optimize_color("#7B00FF", session = session2)
+```
+
+`reset_overrides()` clears them, either all at once or by name:
+
+```{r reset}
+session3 <- reset_overrides(session2, cluster = "Plasma", family = FALSE)
+any(session3$clusters$manual_color)
+```
+
+## Checking the palette
+
+`color_distance()` returns the pairwise perceptual distance matrix (CIE2000
+by default) — a quick way to find the two clusters most likely to be confused:
+
+```{r distance}
+d <- color_distance(cluster_colors(session))
+round(d[1:4, 1:4], 1)
+```
+
+`simulate_cvd()` maps colors through a color-vision-deficiency simulation, and
+both plotting functions take a `cvd` argument so you can preview the palette
+as a viewer with that deficiency would see it:
+
+```{r cvd, fig.height = 4}
+simulate_cvd(cluster_colors(session)[1:4], type = "deutan")
+plot_swatches(session, cvd = "deutan")
+```
+
+## Using the colors elsewhere
+
+`cluster_colors()` returns exactly what other plotting code wants — a named
+vector keyed by cluster id:
+
+```{r use-colors, eval = FALSE}
+Seurat::DimPlot(seurat_obj, cols = cluster_colors(session))
+
+ggplot2::ggplot(cells, ggplot2::aes(UMAP_1, UMAP_2, color = cluster)) +
+  ggplot2::geom_point() +
+  ggplot2::scale_color_manual(values = cluster_colors(session))
+```
+
+The `"data.frame"` format also merges in each cluster's family id and the
+family's own color, so faceting or legend code needs no extra join:
+
+```{r colors-df}
+head(cluster_colors(session, format = "data.frame"))
+```
+
+## Saving and resuming
+
+Sessions round-trip through JSON, which is the stable contract documented in
+the README — so a palette edited today can be reloaded (or read by a
+non-R frontend) later:
+
+```{r json}
+path <- tempfile(fileext = ".json")
+export_palette_json(session, path)
+
+session_back <- import_palette_json(path)
+identical(cluster_colors(session_back), cluster_colors(session))
+```
+
+`export_palette_csv()` writes the same tables as flat CSV when that is easier
+to hand off.
+
+```{r csv}
+export_palette_csv(session, clusters_file = tempfile(fileext = ".csv"))
+```
+
+## Large datasets
+
+Interactive editing does not need every cell drawn. `downsample_stratified()`
+takes a cluster-stratified subsample — with a floor per cluster so rare
+clusters stay visible — for previews; keep the full object for the final
+export.
+
+```{r downsample}
+preview <- downsample_stratified(pdata, max_n = 500, min_per_cluster = 20)
+nrow(preview$cells)
+table(preview$cells$cluster)
+```
+
+Note that the palette itself does not change: colors come from the cluster and
+family structure, not from the number of cells plotted.
+
+## The interactive UI
+
+Everything above is core, and depends only on `colorspace`, `farver`,
+`jsonlite`, and base R. The Shiny app — drag-to-regroup families, HSL sliders,
+live HCL readout, per-cluster color picking — is one optional function:
+
+```{r ui, eval = FALSE}
+launch_palettome_ui(pdata, session = session)
+```
+
+It requires `shiny`, `plotly`, `colourpicker`, and `shinyjs`, all
+`Suggests`-only. If they are missing, it stops with a message naming them and
+nothing else in the package is affected.

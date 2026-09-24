@@ -1,7 +1,7 @@
 Package: palettome
 Title: Hierarchy-Aware, Interactively Editable Color Palettes for Clusters
-Version: 0.1.0
-Authors@R: person("Chenbin", "Huang", email = "nigel.huang.chb@gmail.com", role = c("aut", "cre"))
+Version: 1.0.1
+Authors@R: person("Chenbin", "Huang", email = "chenbin.huang@emory.edu", role = c("aut", "cre"))
 Description: Assigns perceptually-informed color palettes to clustered data
     (e.g. scRNA-seq clusters / cell subtypes from Seurat or plain UMAP
     coordinate tables), where clusters that belong to the same "family"
@@ -27,6 +27,8 @@ Imports:
     utils,
     jsonlite
 Suggests:
+    knitr,
+    rmarkdown,
     testthat (>= 3.0.0),
     ggplot2,
     Seurat,
@@ -35,6 +37,7 @@ Suggests:
     colourpicker,
     shinyjs,
     dendextend
+VignetteBuilder: knitr
 Config/testthat/edition: 3
-URL: https://github.com/ChenbinHuang/Palettome
-BugReports: https://github.com/ChenbinHuang/Palettome/issues
+URL: https://github.com/thisishcb/Palettome
+BugReports: https://github.com/thisishcb/Palettome/issues

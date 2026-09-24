@@ -177,3 +177,7 @@ cython_debug/
 #.idea/
 
 /.quarto/
+
+# R vignette build artifacts (devtools::build_vignettes)
+/doc/
+/Meta/
