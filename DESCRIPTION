@@ -12,7 +12,7 @@ Description: Assigns perceptually-informed color palettes to clustered data
     every generated color remains individually overridable, with manual
     overrides preserved across regeneration. Core algorithms have no UI
     dependencies; an optional interactive Shiny UI is provided separately.
-License: Apache License (>= 2.0)
+License: Apache License 2.0 | file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
@@ -23,7 +23,6 @@ Imports:
     farver,
     stats,
     graphics,
-    methods,
     utils,
     jsonlite
 Suggests:

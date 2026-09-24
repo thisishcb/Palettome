@@ -16,13 +16,13 @@ shinyjs) and degrades to a friendly error if they are missing.
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/ChenbinHuang/Palettome}
-  \item Report bugs at \url{https://github.com/ChenbinHuang/Palettome/issues}
+  \item \url{https://github.com/thisishcb/Palettome}
+  \item Report bugs at \url{https://github.com/thisishcb/Palettome/issues}
 }
 
 }
 \author{
-\strong{Maintainer}: Chenbin Huang \email{nigel.huang.chb@gmail.com}
+\strong{Maintainer}: Chenbin Huang \email{chenbin.huang@emory.edu}
 
 }
 \keyword{internal}

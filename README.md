@@ -212,8 +212,7 @@ to open the recolor dialog:
 `export_palette_json()` writes, and `import_palette_json()` reads, this
 structure. It is deliberately plain and language-agnostic — a future
 Python/Scanpy implementation can read and write the exact same file without
-any R-specific types, so it can share this UI (or a port of it) with zero
-schema changes.
+any R-specific types.
 
 ```json
 {
@@ -259,11 +258,11 @@ optionally the `families` table) as plain CSV with the same column names.
 
 ## Data input contract
 
-`as_cluster_data()` normalizes either input into one `palettome_data` object
+`as_cluster_data()` accomodates either input into one `palettome_data` object
 so every other function only has to know one shape:
 
 - **Data frame**: `as_cluster_data(df, coord_cols = c("UMAP_1","UMAP_2"[,"UMAP_3"]), cluster_col = "cluster", family_col = NULL, cell_id_col = NULL)`
-- **Seurat object**: `as_cluster_data(seurat_obj, reduction = "umap", dims = 1:2, cluster_col = "seurat_clusters", family_col = NULL)` (requires the `Seurat` package, Suggests-only, only touched by this one method)
+- **Seurat object**: `as_cluster_data(seurat_obj, reduction = "umap", dims = 1:2, cluster_col = "seurat_clusters", family_col = NULL)` (requires the `Seurat` package, Suggests-only)
 
 If `family_col`/an explicit family is supplied, `detect_families()` uses it
 directly; otherwise it hierarchically clusters cluster centroids (or a

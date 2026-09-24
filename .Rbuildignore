@@ -3,3 +3,6 @@
 ^\.github$
 ^doc$
 ^Meta$
+^palettome_.*\.tar\.gz$
+^\.Rproj\.user$
+^cran-comments\.md$
