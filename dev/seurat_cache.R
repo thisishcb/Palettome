@@ -44,4 +44,6 @@ load_seurat_cache <- function(name) {
 #   source("dev/seurat_cache.R")
 #   pdata <- load_seurat_cache("Palette_merged_all_cells")
 #   pdata <- load_seurat_cache("Palette_rough_selected_bcells")
+#   launch_palettome_ui(pdata)
+
 
