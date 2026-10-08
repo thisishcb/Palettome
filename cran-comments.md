@@ -22,10 +22,14 @@ This is a resubmission. In this version I have:
 ## Test environments
 
 * local macOS 26.6.2 (aarch64), R 4.4.2
-* win-builder, R-devel <!-- TODO: fill in after devtools::check_win_devel() -->
+* win-builder, Windows Server 2022 x64, R-devel (2026-10-05 r90641 ucrt)
 
 ## R CMD check results
 
 0 errors | 0 warnings | 1 note
 
 * This is a new submission.
+* The words flagged as possibly misspelled in DESCRIPTION are correct:
+  author names in the method references (Zeileis, Sharma, Dalal, Machado,
+  Oliveira, Fernandes, "et al."), and standard technical terms (HCL,
+  CIEDE, UMAP, scRNA, UI, overridable).
