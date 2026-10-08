@@ -21,3 +21,8 @@ Preview-only helper: does not mutate a session, just maps colors through
 \code{\link[colorspace:simulate_cvd]{colorspace::deutan()}}/\code{\link[colorspace:simulate_cvd]{colorspace::protan()}}/\code{\link[colorspace:simulate_cvd]{colorspace::tritan()}} so a
 UI can toggle a colorblind-safe preview of an already-generated palette.
 }
+\examples{
+pal <- c("#1B9E77", "#D95F02", "#7570B3", "#E7298A")
+simulate_cvd(pal, type = "deutan")
+simulate_cvd(pal, type = "tritan", severity = 0.5)
+}

@@ -21,3 +21,10 @@ recompute the now-unlocked colors).
 \description{
 Reset manual color overrides
 }
+\examples{
+assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+session <- set_manual_color(session, cluster = "c1", color = "#2E5A87")
+session <- reset_overrides(session)
+any(session$clusters$manual_color)
+}

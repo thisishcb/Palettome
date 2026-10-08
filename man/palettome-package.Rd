@@ -22,7 +22,7 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Chenbin Huang \email{chenbin.huang@emory.edu}
+\strong{Maintainer}: Chenbin Huang \email{chenbin.huang@emory.edu} (\href{https://orcid.org/0000-0002-2179-2217}{ORCID})
 
 }
 \keyword{internal}

@@ -15,3 +15,12 @@ A \code{palettome_session}.
 \description{
 Import a palette session from JSON
 }
+\examples{
+assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+path <- file.path(tempdir(), "palette.json")
+export_palette_json(session, path)
+session_back <- import_palette_json(path)
+identical(cluster_colors(session_back), cluster_colors(session))
+unlink(path)
+}

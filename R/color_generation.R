@@ -14,6 +14,9 @@ NULL
 #'   (`"CIE2000"`, `"CIE94"`, `"CIE1976"`/`"euclidean"`, ...).
 #' @return A symmetric numeric matrix of pairwise distances, named by `hex`.
 #' @export
+#' @examples
+#' d <- color_distance(c("#1B9E77", "#D95F02", "#7570B3"))
+#' round(d, 1)
 color_distance <- function(hex, method = "CIE2000") {
   lab <- farver::decode_colour(hex, to = "lab")
   d <- farver::compare_colour(lab, lab, from_space = "lab", method = method)
@@ -32,6 +35,10 @@ color_distance <- function(hex, method = "CIE2000") {
 #' @param severity Severity in `[0, 1]`, passed through to colorspace.
 #' @return Character vector of simulated hex colors, same length as `hex`.
 #' @export
+#' @examples
+#' pal <- c("#1B9E77", "#D95F02", "#7570B3", "#E7298A")
+#' simulate_cvd(pal, type = "deutan")
+#' simulate_cvd(pal, type = "tritan", severity = 0.5)
 simulate_cvd <- function(hex, type = c("deutan", "protan", "tritan"), severity = 1) {
   type <- match.arg(type)
   fn <- switch(type,
@@ -427,7 +434,8 @@ simulate_cvd <- function(hex, type = c("deutan", "protan", "tritan"), severity =
 #'   or coordinate columns, e.g. [compute_centroids()]) or a square
 #'   cluster-by-cluster connectivity/distance matrix. `NULL` disables
 #'   neighbor-aware placement (falls back to even hue spacing).
-#' @param seed Random seed.
+#' @param seed Random seed, so the same inputs always give the same colors.
+#'   The caller's random number state is restored on exit.
 #' @param lightness_range,chroma_range Length-2 numeric ranges in HCL space,
 #'   or `"auto"` (default) to derive them from manual overrides when present
 #'   and from mode/style presets otherwise.
@@ -438,6 +446,31 @@ simulate_cvd <- function(hex, type = c("deutan", "protan", "tritan"), severity =
 #' @return A `palettome_session` object (see the package README for the JSON
 #'   schema).
 #' @export
+#' @examples
+#' cells <- data.frame(
+#'   x = rnorm(120, rep(c(0, 1, 6, 7, 3, 4), each = 20)),
+#'   y = rnorm(120, rep(c(0, 1, 0, 1, 6, 7), each = 20)),
+#'   cluster = rep(c("T1", "T2", "B1", "B2", "M1", "M2"), each = 20)
+#' )
+#' pdata <- as_cluster_data(cells, coord_cols = c("x", "y"), cluster_col = "cluster")
+#'
+#' fam <- detect_families(pdata, k = 3)
+#'
+#' # Harmonious: one coordinated hue sweep, neighbor-aware
+#' session <- generate_palette(fam$assignment, mode = "harmonious",
+#'                             neighbors = fam$neighbors, seed = 1)
+#' cluster_colors(session)
+#'
+#' # Different seeds give different sweeps
+#' cluster_colors(generate_palette(fam$assignment, seed = 7))
+#'
+#' # Contrast: every cluster maximally distinguishable
+#' session_c <- generate_palette(fam$assignment, mode = "contrast", seed = 1)
+#' cluster_colors(session_c)
+#'
+#' # Sweep along a gradient you choose
+#' cluster_colors(generate_palette(fam$assignment,
+#'                                 sweep_anchors = c("#0B3D91", "#FF5733")))
 generate_palette <- function(assignment, session = NULL,
                               mode = c("harmonious", "contrast"),
                               harmonious_style = c("sweep", "per_family"),
@@ -450,6 +483,7 @@ generate_palette <- function(assignment, session = NULL,
                               hue_range = c(0, 360),
                               cvd = c("none", "deutan", "protan", "tritan"),
                               n_cells = NULL) {
+  .preserve_rng_state()
   mode <- match.arg(mode)
   harmonious_style <- match.arg(harmonious_style)
   cvd <- match.arg(cvd)
@@ -636,6 +670,11 @@ generate_palette <- function(assignment, session = NULL,
 #'   `"vivid"`.
 #' @return A hex color string with the same hue, adjusted L/C.
 #' @export
+#' @examples
+#' assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+#' session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+#' optimize_color("#7B00FF")
+#' optimize_color("#7B00FF", session = session, target = "muted")
 optimize_color <- function(color, session = NULL, target = c("auto", "muted", "vivid")) {
   target <- match.arg(target)
   hcl <- .to_hcl(color)
@@ -665,22 +704,47 @@ optimize_color <- function(color, session = NULL, target = c("auto", "muted", "v
 #' [generate_palette()] calls (until reset with [reset_overrides()]).
 #'
 #' @param session A `palettome_session`.
-#' @param cluster,family Cluster id / family id to recolor (either or both;
-#'   at least one required).
-#' @param color A hex color string.
+#' @param cluster,family Cluster ids / family ids to recolor (either or both;
+#'   at least one required). May be vectors to recolor several at once.
+#' @param color Hex color string(s): either a single color applied to every
+#'   target, or one color per id (recycled separately for `cluster` and
+#'   `family`).
 #' @return The updated `palettome_session`.
 #' @export
+#' @examples
+#' assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+#' session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+#' session <- set_manual_color(session, cluster = "c1", color = "#2E5A87")
+#' session$clusters[, c("cluster", "color", "manual_color")]
+#'
+#' # Several clusters at once, one color each
+#' session <- set_manual_color(session, cluster = c("c3", "c4"),
+#'                             color = c("#2E5A87", "#6E6E6E"))
+#'
+#' # Manual picks survive regeneration
+#' session <- generate_palette(assignment, session = session, mode = "contrast")
+#' cluster_colors(session)[["c1"]]
 set_manual_color <- function(session, cluster = NULL, family = NULL, color) {
   stopifnot(inherits(session, "palettome_session"), !is.null(cluster) || !is.null(family))
+  .targets <- function(ids, pool, what) {
+    ids <- as.character(ids)
+    if (length(color) != 1L && length(color) != length(ids)) {
+      stop("`color` must have length 1 or the same length as `", what, "` (",
+           length(ids), ").", call. = FALSE)
+    }
+    i <- match(ids, pool)
+    if (anyNA(i)) {
+      stop("Unknown ", what, ": ", paste(ids[is.na(i)], collapse = ", "), call. = FALSE)
+    }
+    i
+  }
   if (!is.null(cluster)) {
-    i <- match(cluster, session$clusters$cluster)
-    if (is.na(i)) stop("Unknown cluster: ", cluster, call. = FALSE)
+    i <- .targets(cluster, session$clusters$cluster, "cluster")
     session$clusters$color[i] <- color
     session$clusters$manual_color[i] <- TRUE
   }
   if (!is.null(family)) {
-    i <- match(family, session$families$family_id)
-    if (is.na(i)) stop("Unknown family: ", family, call. = FALSE)
+    i <- .targets(family, session$families$family_id, "family")
     session$families$color[i] <- color
     session$families$manual_color[i] <- TRUE
   }
@@ -697,6 +761,12 @@ set_manual_color <- function(session, cluster = NULL, family = NULL, color) {
 #'   `manual_color` flags are cleared -- call [generate_palette()] again to
 #'   recompute the now-unlocked colors).
 #' @export
+#' @examples
+#' assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+#' session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+#' session <- set_manual_color(session, cluster = "c1", color = "#2E5A87")
+#' session <- reset_overrides(session)
+#' any(session$clusters$manual_color)
 reset_overrides <- function(session, cluster = TRUE, family = TRUE) {
   stopifnot(inherits(session, "palettome_session"))
   if (isTRUE(cluster)) {

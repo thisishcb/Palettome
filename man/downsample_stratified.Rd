@@ -16,7 +16,8 @@ downsample_stratified(pdata, max_n = 50000, min_per_cluster = 20, seed = 1)
 over-represents small clusters relative to a uniform per-cluster share,
 so rare clusters stay visible.}
 
-\item{seed}{Random seed for reproducible subsampling.}
+\item{seed}{Random seed for reproducible subsampling. The caller's random
+number state is restored on exit.}
 }
 \value{
 A \code{palettome_data} object with a (possibly) reduced \code{cells} table.
@@ -27,4 +28,14 @@ keeps hierarchy editing and recoloring responsive on multi-million-cell
 datasets: interactive redraws use this subsample, and only a final export
 needs to touch every cell. See \verb{inst/benchmark/} for a benchmark
 justifying the approach and default threshold.
+}
+\examples{
+cells <- data.frame(
+  x = rnorm(120, rep(c(0, 1, 6, 7, 3, 4), each = 20)),
+  y = rnorm(120, rep(c(0, 1, 0, 1, 6, 7), each = 20)),
+  cluster = rep(c("T1", "T2", "B1", "B2", "M1", "M2"), each = 20)
+)
+pdata <- as_cluster_data(cells, coord_cols = c("x", "y"), cluster_col = "cluster")
+small <- downsample_stratified(pdata, max_n = 60, min_per_cluster = 5)
+table(small$cells$cluster)
 }

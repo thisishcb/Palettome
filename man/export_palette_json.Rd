@@ -20,3 +20,10 @@ package README (\code{schema_version}, \code{clusters}, \code{families}, \code{p
 future non-R (e.g. Python/Scanpy) frontend could read/write the same
 file.
 }
+\examples{
+assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+path <- file.path(tempdir(), "palette.json")
+export_palette_json(session, path)
+unlink(path)
+}

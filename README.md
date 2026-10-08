@@ -4,6 +4,8 @@ Hierarchy-aware, interactively editable color palettes for clustered data —
 built for scRNA-seq clusters/cell subtypes (Seurat, UMAP) but not
 hard-dependent on Seurat.
 
+![The same UMAP colored three ways: ggplot2's default palette, palettome harmonious mode, and palettome contrast mode](man/figures/readme-hero.png)
+
 > LLM was used in this project to speed up the development.
 
 Clusters that belong to the same **family** / compartment (e.g. subtypes of
@@ -23,6 +25,8 @@ T cells, subtypes of myeloid cells) can be colored either:
   visible through a secondary color channel (the family's own accent/tag
   color).
 
+![Palettes for the same four cell families across seeds, a custom sweep_anchors gradient, per_family style, and contrast mode](man/figures/readme-gallery.png)
+
 Color choice is color-theory aware even for random seeds: chroma is kept
 inside the displayable gamut and away from the neon and muddy yellow-green
 zones, hues are spread with a low-discrepancy sequence, and each hue gets
@@ -30,6 +34,11 @@ its natural lightness. When neighbor information is supplied, families that
 are **adjacent** in the embedding get contrasting hues by default (or
 analogous, by choice — `neighbor_hues`), and within a family
 spatially-adjacent clusters are given far-apart shades for local contrast.
+
+`simulate_cvd()` and the `cvd` argument of the plotting functions preview a
+palette as it appears with color-vision deficiency:
+
+![A contrast-mode palette shown as generated and under simulated deutan, protan, and tritan color-vision deficiency](man/figures/readme-cvd.png)
 
 Every generated color can be overridden by hand, and manual overrides
 survive re-running the generator (new mode, new seed, edited families) until
@@ -170,6 +179,9 @@ launch_palettome_ui(pdata)                    # auto-detects families
 launch_palettome_ui(pdata, session = session) # resume a saved session
 ```
 
+<!-- TODO: save the UI screenshot as man/figures/readme-ui.png -->
+![The palettome interactive UI: embedding scatter plot, family dendrogram, and drag-and-drop compartment panel](man/figures/readme-ui.png)
+
 The app shows a WebGL (`plotly` `scattergl`) scatter plot of the embedding
 (fixed 1:1 x/y aspect ratio, so distances aren't visually distorted), a
 family dendrogram, and a drag-and-drop compartment panel: drag a cluster
@@ -258,7 +270,7 @@ optionally the `families` table) as plain CSV with the same column names.
 
 ## Data input contract
 
-`as_cluster_data()` accomodates either input into one `palettome_data` object
+`as_cluster_data()` accommodates either input into one `palettome_data` object
 so every other function only has to know one shape:
 
 - **Data frame**: `as_cluster_data(df, coord_cols = c("UMAP_1","UMAP_2"[,"UMAP_3"]), cluster_col = "cluster", family_col = NULL, cell_id_col = NULL)`

@@ -22,3 +22,12 @@ Invisibly, \code{TRUE}.
 \description{
 Export cluster and/or family color tables as CSV
 }
+\examples{
+assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+clusters_file <- file.path(tempdir(), "clusters.csv")
+families_file <- file.path(tempdir(), "families.csv")
+export_palette_csv(session, clusters_file, families_file)
+read.csv(clusters_file)
+unlink(c(clusters_file, families_file))
+}

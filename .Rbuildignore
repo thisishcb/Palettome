@@ -6,3 +6,4 @@
 ^palettome_.*\.tar\.gz$
 ^\.Rproj\.user$
 ^cran-comments\.md$
+^LICENSE$

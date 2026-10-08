@@ -342,7 +342,7 @@ ggplot2::ggplot(cells, ggplot2::aes(UMAP_1, UMAP_2, color = cluster)) +
   ggplot2::scale_color_manual(values = cluster_colors(session))
 ```
 
-Or, if the copy-paste ready named vector is prefered:
+Or, if you prefer a copy-paste-ready named vector:
 ```{r color-hard-code, eval=FALSE}
 cluster_colors(session) |> dput()
 ```

@@ -20,3 +20,7 @@ Thin wrapper over \code{\link[farver:compare_colour]{farver::compare_colour()}} 
 by the contrast-mode selector and by the package tests to check that
 generated colors respect a minimum perceptual separation.
 }
+\examples{
+d <- color_distance(c("#1B9E77", "#D95F02", "#7570B3"))
+round(d, 1)
+}

@@ -1,18 +1,24 @@
 Package: palettome
 Title: Hierarchy-Aware, Interactively Editable Color Palettes for Clusters
 Version: 1.0.1
-Authors@R: person("Chenbin", "Huang", email = "chenbin.huang@emory.edu", role = c("aut", "cre"))
+Authors@R: person("Chenbin", "Huang", email = "chenbin.huang@emory.edu", role = c("aut", "cre"),
+    comment = c(ORCID = "0000-0002-2179-2217"))
 Description: Assigns perceptually-informed color palettes to clustered data
-    (e.g. scRNA-seq clusters / cell subtypes from Seurat or plain UMAP
+    (e.g. scRNA-seq clusters / cell subtypes from 'Seurat' or plain UMAP
     coordinate tables), where clusters that belong to the same "family"
     (e.g. subtypes of T cells) can be colored either harmoniously (shared
     hue, varying shade) or with maximal contrast (with family membership
     encoded via a secondary channel). Families can be auto-detected from
     embedding-space hierarchical clustering or supplied explicitly, and
     every generated color remains individually overridable, with manual
-    overrides preserved across regeneration. Core algorithms have no UI
-    dependencies; an optional interactive Shiny UI is provided separately.
-License: Apache License 2.0 | file LICENSE
+    overrides preserved across regeneration. Colors are constructed in the
+    HCL space as in Zeileis et al. (2020) <doi:10.18637/jss.v096.i01>,
+    separated using the CIEDE2000 color difference of Sharma, Wu and Dalal
+    (2005) <doi:10.1002/col.20070>, and checked for color-vision deficiency
+    using the simulation of Machado, Oliveira and Fernandes (2009)
+    <doi:10.1109/TVCG.2009.113>. Core algorithms have no UI dependencies;
+    an optional interactive 'shiny' UI is provided separately.
+License: Apache License (== 2.0)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2

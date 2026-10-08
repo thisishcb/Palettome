@@ -18,6 +18,15 @@
 #' @return A list with `hclust` (an [stats::hclust] object), `centroids`
 #'   (from [compute_centroids()]), and `clusters` (the cluster id order used).
 #' @export
+#' @examples
+#' cells <- data.frame(
+#'   x = rnorm(120, rep(c(0, 1, 6, 7, 3, 4), each = 20)),
+#'   y = rnorm(120, rep(c(0, 1, 0, 1, 6, 7), each = 20)),
+#'   cluster = rep(c("T1", "T2", "B1", "B2", "M1", "M2"), each = 20)
+#' )
+#' pdata <- as_cluster_data(cells, coord_cols = c("x", "y"), cluster_col = "cluster")
+#' dendro <- compute_family_dendrogram(pdata)
+#' dendro$hclust
 compute_family_dendrogram <- function(pdata, dist_method = "euclidean",
                                        hclust_method = "average",
                                        connectivity = NULL) {
@@ -61,6 +70,15 @@ compute_family_dendrogram <- function(pdata, dist_method = "euclidean",
 #' @return A data frame with columns `cluster` and `family_id` (character,
 #'   `"F1"`, `"F2"`, ...).
 #' @export
+#' @examples
+#' cells <- data.frame(
+#'   x = rnorm(120, rep(c(0, 1, 6, 7, 3, 4), each = 20)),
+#'   y = rnorm(120, rep(c(0, 1, 0, 1, 6, 7), each = 20)),
+#'   cluster = rep(c("T1", "T2", "B1", "B2", "M1", "M2"), each = 20)
+#' )
+#' pdata <- as_cluster_data(cells, coord_cols = c("x", "y"), cluster_col = "cluster")
+#' dendro <- compute_family_dendrogram(pdata)
+#' cut_families(dendro, k = 3)
 cut_families <- function(dendro, k = NULL, h = NULL) {
   stopifnot(is.list(dendro), !is.null(dendro$hclust))
   n <- length(dendro$clusters)
@@ -105,6 +123,16 @@ cut_families <- function(dendro, k = NULL, h = NULL) {
 #'       without recomputing anything.}
 #'   }
 #' @export
+#' @examples
+#' cells <- data.frame(
+#'   x = rnorm(120, rep(c(0, 1, 6, 7, 3, 4), each = 20)),
+#'   y = rnorm(120, rep(c(0, 1, 0, 1, 6, 7), each = 20)),
+#'   cluster = rep(c("T1", "T2", "B1", "B2", "M1", "M2"), each = 20)
+#' )
+#' pdata <- as_cluster_data(cells, coord_cols = c("x", "y"), cluster_col = "cluster")
+#' fam <- detect_families(pdata, k = 3)
+#' fam$method
+#' fam$assignment
 detect_families <- function(pdata, k = NULL, h = NULL,
                              dist_method = "euclidean",
                              hclust_method = "average",
@@ -159,6 +187,15 @@ detect_families <- function(pdata, k = NULL, h = NULL,
 #' @return Invisibly, the (possibly colored) dendrogram object that was
 #'   plotted.
 #' @export
+#' @examples
+#' cells <- data.frame(
+#'   x = rnorm(120, rep(c(0, 1, 6, 7, 3, 4), each = 20)),
+#'   y = rnorm(120, rep(c(0, 1, 0, 1, 6, 7), each = 20)),
+#'   cluster = rep(c("T1", "T2", "B1", "B2", "M1", "M2"), each = 20)
+#' )
+#' pdata <- as_cluster_data(cells, coord_cols = c("x", "y"), cluster_col = "cluster")
+#' fam <- detect_families(pdata, k = 3)
+#' plot_dendrogram(fam$dendro, k = 3)
 plot_dendrogram <- function(dendro, k = NULL, h = NULL) {
   stopifnot(is.list(dendro), !is.null(dendro$hclust))
   hc <- dendro$hclust

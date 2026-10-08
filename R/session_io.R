@@ -9,6 +9,12 @@
 #' @param file Path to write to.
 #' @return Invisibly, the JSON string that was written.
 #' @export
+#' @examples
+#' assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+#' session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+#' path <- file.path(tempdir(), "palette.json")
+#' export_palette_json(session, path)
+#' unlink(path)
 export_palette_json <- function(session, file) {
   stopifnot(inherits(session, "palettome_session"))
   json <- jsonlite::toJSON(
@@ -24,6 +30,14 @@ export_palette_json <- function(session, file) {
 #' @param file Path to a JSON file written by [export_palette_json()].
 #' @return A `palettome_session`.
 #' @export
+#' @examples
+#' assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+#' session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+#' path <- file.path(tempdir(), "palette.json")
+#' export_palette_json(session, path)
+#' session_back <- import_palette_json(path)
+#' identical(cluster_colors(session_back), cluster_colors(session))
+#' unlink(path)
 import_palette_json <- function(file) {
   raw <- jsonlite::fromJSON(file, simplifyDataFrame = TRUE)
   clusters <- as.data.frame(raw$clusters, stringsAsFactors = FALSE)
@@ -52,6 +66,14 @@ import_palette_json <- function(file) {
 #'   table to (columns `family_id`, `color`, `manual_color`).
 #' @return Invisibly, `TRUE`.
 #' @export
+#' @examples
+#' assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+#' session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+#' clusters_file <- file.path(tempdir(), "clusters.csv")
+#' families_file <- file.path(tempdir(), "families.csv")
+#' export_palette_csv(session, clusters_file, families_file)
+#' read.csv(clusters_file)
+#' unlink(c(clusters_file, families_file))
 export_palette_csv <- function(session, clusters_file, families_file = NULL) {
   stopifnot(inherits(session, "palettome_session"))
   if (!is.null(clusters_file)) {

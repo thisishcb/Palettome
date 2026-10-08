@@ -69,3 +69,19 @@ coordinates + cluster labels, or a \code{Seurat} object, into the common
 consumes. This is the only place that needs to know about Seurat, and
 Seurat is never required to be installed to use the rest of the package.
 }
+\examples{
+cells <- data.frame(
+  x = rnorm(120, rep(c(0, 1, 6, 7, 3, 4), each = 20)),
+  y = rnorm(120, rep(c(0, 1, 0, 1, 6, 7), each = 20)),
+  cluster = rep(c("T1", "T2", "B1", "B2", "M1", "M2"), each = 20)
+)
+
+pdata <- as_cluster_data(cells, coord_cols = c("x", "y"), cluster_col = "cluster")
+str(pdata$cells)
+
+# With an explicit family column
+cells$lineage <- substr(cells$cluster, 1, 1)
+pdata_fam <- as_cluster_data(cells, coord_cols = c("x", "y"),
+                             cluster_col = "cluster", family_col = "lineage")
+pdata_fam$has_family
+}

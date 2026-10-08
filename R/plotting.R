@@ -19,6 +19,16 @@
 #' @return A `ggplot` object if ggplot2 is installed, otherwise `NULL`
 #'   (invisibly) after drawing directly to the current base graphics device.
 #' @export
+#' @examples
+#' cells <- data.frame(
+#'   x = rnorm(120, rep(c(0, 1, 6, 7, 3, 4), each = 20)),
+#'   y = rnorm(120, rep(c(0, 1, 0, 1, 6, 7), each = 20)),
+#'   cluster = rep(c("T1", "T2", "B1", "B2", "M1", "M2"), each = 20)
+#' )
+#' pdata <- as_cluster_data(cells, coord_cols = c("x", "y"), cluster_col = "cluster")
+#' fam <- detect_families(pdata, k = 3)
+#' session <- generate_palette(fam$assignment, neighbors = fam$neighbors, seed = 1)
+#' plot_palette_static(pdata, session)
 plot_palette_static <- function(pdata, session, cvd = "none",
                                  point_size = 0.6, alpha = 0.7) {
   stopifnot(inherits(pdata, "palettome_data"), inherits(session, "palettome_session"))
@@ -61,6 +71,11 @@ plot_palette_static <- function(pdata, session, cvd = "none",
 #'   continuous ramp; `"id"` keeps `family_id` / `cluster` order.
 #' @return Invisibly, `NULL`; draws to the current graphics device.
 #' @export
+#' @examples
+#' assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+#' session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+#' plot_swatches(session)
+#' plot_swatches(session, cvd = "deutan")
 plot_swatches <- function(session, cvd = "none", order_by = c("lightness", "id")) {
   stopifnot(inherits(session, "palettome_session"))
   order_by <- match.arg(order_by)

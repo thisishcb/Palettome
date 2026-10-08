@@ -23,3 +23,9 @@ Same as \code{\link[=cluster_colors]{cluster_colors()}}, but for each family's r
 color (the harmonious-mode base hue, or the contrast-mode secondary
 channel) rather than per-cluster fill colors.
 }
+\examples{
+assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+family_colors(session)
+family_colors(session, format = "data.frame")
+}

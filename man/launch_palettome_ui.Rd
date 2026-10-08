@@ -51,3 +51,14 @@ them. If any are missing, this fails with a friendly message rather than
 an obscure error, and points out that the rest of the package still
 works.
 }
+\examples{
+cells <- data.frame(
+  x = rnorm(120, rep(c(0, 1, 6, 7, 3, 4), each = 20)),
+  y = rnorm(120, rep(c(0, 1, 0, 1, 6, 7), each = 20)),
+  cluster = rep(c("T1", "T2", "B1", "B2", "M1", "M2"), each = 20)
+)
+pdata <- as_cluster_data(cells, coord_cols = c("x", "y"), cluster_col = "cluster")
+if (interactive()) {
+  launch_palettome_ui(pdata, k = 3)
+}
+}

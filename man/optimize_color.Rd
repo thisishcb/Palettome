@@ -25,3 +25,9 @@ matched to the lightness/chroma distribution of an existing \code{session}
 (so a hand-picked color sits with the rest), or, with no session, toward
 the natural lightness for that hue and a pleasing (non-neon) chroma.
 }
+\examples{
+assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+optimize_color("#7B00FF")
+optimize_color("#7B00FF", session = session, target = "muted")
+}

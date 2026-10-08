@@ -19,3 +19,21 @@ NULL
 # it here silences the R CMD check "no visible binding for global variable"
 # NOTE without adding a hard dependency on ggplot2 or rlang.
 utils::globalVariables(".data")
+
+# Exported functions that take a `seed` call set.seed() internally so the same
+# seed always gives the same colors. Calling this at the top of such a function
+# restores the caller's RNG state (.Random.seed) when that function exits, so
+# palettome never changes the user's random number stream as a side effect.
+.preserve_rng_state <- function(envir = parent.frame()) {
+  had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+  old_seed <- if (had_seed) get(".Random.seed", envir = globalenv(), inherits = FALSE)
+  restore <- function() {
+    if (had_seed) {
+      assign(".Random.seed", old_seed, envir = globalenv())
+    } else if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+      rm(".Random.seed", envir = globalenv())
+    }
+  }
+  do.call(on.exit, list(bquote(.(restore)()), add = TRUE), envir = envir)
+  invisible(NULL)
+}

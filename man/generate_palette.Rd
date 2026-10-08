@@ -48,7 +48,8 @@ or coordinate columns, e.g. \code{\link[=compute_centroids]{compute_centroids()}
 cluster-by-cluster connectivity/distance matrix. \code{NULL} disables
 neighbor-aware placement (falls back to even hue spacing).}
 
-\item{seed}{Random seed.}
+\item{seed}{Random seed, so the same inputs always give the same colors.
+The caller's random number state is restored on exit.}
 
 \item{lightness_range, chroma_range}{Length-2 numeric ranges in HCL space,
 or \code{"auto"} (default) to derive them from manual overrides when present
@@ -95,4 +96,30 @@ family with \code{manual_color == TRUE} keeps its color, the generator treats
 those as fixed and avoids clashing with them, and with
 \code{lightness_range}/\code{chroma_range} left at \code{"auto"} the non-manual colors
 are regenerated inside the L/C envelope implied by the manual picks.
+}
+\examples{
+cells <- data.frame(
+  x = rnorm(120, rep(c(0, 1, 6, 7, 3, 4), each = 20)),
+  y = rnorm(120, rep(c(0, 1, 0, 1, 6, 7), each = 20)),
+  cluster = rep(c("T1", "T2", "B1", "B2", "M1", "M2"), each = 20)
+)
+pdata <- as_cluster_data(cells, coord_cols = c("x", "y"), cluster_col = "cluster")
+
+fam <- detect_families(pdata, k = 3)
+
+# Harmonious: one coordinated hue sweep, neighbor-aware
+session <- generate_palette(fam$assignment, mode = "harmonious",
+                            neighbors = fam$neighbors, seed = 1)
+cluster_colors(session)
+
+# Different seeds give different sweeps
+cluster_colors(generate_palette(fam$assignment, seed = 7))
+
+# Contrast: every cluster maximally distinguishable
+session_c <- generate_palette(fam$assignment, mode = "contrast", seed = 1)
+cluster_colors(session_c)
+
+# Sweep along a gradient you choose
+cluster_colors(generate_palette(fam$assignment,
+                                sweep_anchors = c("#0B3D91", "#FF5733")))
 }

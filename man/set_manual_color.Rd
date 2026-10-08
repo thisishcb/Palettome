@@ -9,10 +9,12 @@ set_manual_color(session, cluster = NULL, family = NULL, color)
 \arguments{
 \item{session}{A \code{palettome_session}.}
 
-\item{cluster, family}{Cluster id / family id to recolor (either or both;
-at least one required).}
+\item{cluster, family}{Cluster ids / family ids to recolor (either or both;
+at least one required). May be vectors to recolor several at once.}
 
-\item{color}{A hex color string.}
+\item{color}{Hex color string(s): either a single color applied to every
+target, or one color per id (recycled separately for \code{cluster} and
+\code{family}).}
 }
 \value{
 The updated \code{palettome_session}.
@@ -21,4 +23,18 @@ The updated \code{palettome_session}.
 Sets \code{color} and flags \code{manual_color = TRUE} for the given cluster and/or
 family in a session. Manually-colored entries are left untouched by later
 \code{\link[=generate_palette]{generate_palette()}} calls (until reset with \code{\link[=reset_overrides]{reset_overrides()}}).
+}
+\examples{
+assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+session <- set_manual_color(session, cluster = "c1", color = "#2E5A87")
+session$clusters[, c("cluster", "color", "manual_color")]
+
+# Several clusters at once, one color each
+session <- set_manual_color(session, cluster = c("c3", "c4"),
+                            color = c("#2E5A87", "#6E6E6E"))
+
+# Manual picks survive regeneration
+session <- generate_palette(assignment, session = session, mode = "contrast")
+cluster_colors(session)[["c1"]]
 }

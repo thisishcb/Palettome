@@ -23,3 +23,13 @@ to color branches by family when it is installed, and falls back to base
 \code{\link[stats:hclust]{stats::plot.hclust()}} with \code{\link[stats:rect.hclust]{stats::rect.hclust()}} otherwise. Either way
 this only needs base R + stats to run.
 }
+\examples{
+cells <- data.frame(
+  x = rnorm(120, rep(c(0, 1, 6, 7, 3, 4), each = 20)),
+  y = rnorm(120, rep(c(0, 1, 0, 1, 6, 7), each = 20)),
+  cluster = rep(c("T1", "T2", "B1", "B2", "M1", "M2"), each = 20)
+)
+pdata <- as_cluster_data(cells, coord_cols = c("x", "y"), cluster_col = "cluster")
+fam <- detect_families(pdata, k = 3)
+plot_dendrogram(fam$dendro, k = 3)
+}

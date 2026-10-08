@@ -24,3 +24,9 @@ cluster, colored swatch + label, visually grouped and separated by
 family, with the family's own color shown as a header bar. Suitable for
 exporting as PNG/SVG alongside the main plot.
 }
+\examples{
+assignment <- data.frame(cluster = paste0("c", 1:4), family_id = rep(c("F1", "F2"), each = 2))
+session <- generate_palette(assignment, mode = "harmonious", seed = 1)
+plot_swatches(session)
+plot_swatches(session, cvd = "deutan")
+}
