@@ -16,6 +16,20 @@ library(plotly)
 
 pt_env <- get(".pt_env", envir = asNamespace("palettome"))
 
+copy_js <- "
+function ptCopy(id, btn) {
+  var txt = document.getElementById(id).innerText;
+  var done = function() { var o = btn.innerText; btn.innerText = 'Copied!'; setTimeout(function() { btn.innerText = o; }, 1200); };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(txt).then(done);
+  } else {
+    // RStudio viewer etc.: fall back to a hidden textarea + execCommand
+    var ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done();
+  }
+}
+"
+
 drag_drop_js <- "
 document.addEventListener('dragstart', function(e) {
   if (e.target.classList.contains('pt-chip')) {
@@ -45,6 +59,7 @@ pt_css <- "
 .pt-chip { display: inline-block; padding: 3px 8px; margin: 2px; border-radius: 4px; cursor: grab; color: #fff; text-shadow: 0 0 2px rgba(0,0,0,.6); font-size: 12px; }
 .pt-range-preview { display: flex; height: 14px; margin: -6px 0 12px 0; border-radius: 3px; overflow: hidden; border: 1px solid rgba(0,0,0,.08); }
 .pt-range-preview > div { flex: 1; }
+.pt-code pre { max-height: 220px; overflow: auto; font-size: 11px; }
 "
 
 n_clusters <- length(unique(pt_env$assignment$cluster))
@@ -53,7 +68,7 @@ p0 <- pt_env$session$params
 
 ui <- fluidPage(
   shinyjs::useShinyjs(),
-  tags$head(tags$style(HTML(pt_css)), tags$script(HTML(drag_drop_js))),
+  tags$head(tags$style(HTML(pt_css)), tags$script(HTML(drag_drop_js)), tags$script(HTML(copy_js))),
   titlePanel("Palettome"),
   sidebarLayout(
     sidebarPanel(
@@ -104,6 +119,12 @@ ui <- fluidPage(
       downloadButton("dl_png", "Export PNG (full render)"),
       tags$hr(),
       fileInput("load_session", "Load session (JSON)", accept = ".json"),
+      tags$hr(),
+      actionButton("done", "Done -- return session to R", class = "btn-success"),
+      tags$div(
+        style = "font-size:11px; color:#888; margin-top:4px;",
+        "Closes the app; launch_palettome_ui() then returns the edited session."
+      ),
       width = 3
     ),
     mainPanel(
@@ -113,6 +134,19 @@ ui <- fluidPage(
         column(6,
           h4("Families (drag chips to regroup, click to recolor)"),
           uiOutput("family_bins")
+        )
+      ),
+      h4("R code (paste into your script)"),
+      fluidRow(
+        column(6, class = "pt-code",
+          actionButton("copy_cluster_code", "Copy cluster colors",
+            onclick = "ptCopy('cluster_code', this)"),
+          verbatimTextOutput("cluster_code")
+        ),
+        column(6, class = "pt-code",
+          actionButton("copy_family_code", "Copy family colors",
+            onclick = "ptCopy('family_code', this)"),
+          verbatimTextOutput("family_code")
         )
       ),
       width = 9
@@ -462,6 +496,22 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$regen, regenerate())
+
+  # Mirror the live session into pt_env so launch_palettome_ui() can return
+  # it even if the app is stopped by an interrupt rather than "Done".
+  observe(assign("session", rv$session, envir = pt_env))
+
+  # Named color vector -> pasteable R code, one entry per line. Names are
+  # always quoted so ids like "3" or "T cell" stay valid R.
+  color_code <- function(var, cols) {
+    entries <- sprintf("  %s = %s", encodeString(names(cols), quote = '"'),
+      encodeString(unname(cols), quote = '"'))
+    paste0(var, " <- c(\n", paste(entries, collapse = ",\n"), "\n)")
+  }
+  output$cluster_code <- renderText(color_code("cluster_colors", palettome::cluster_colors(rv$session)))
+  output$family_code <- renderText(color_code("family_colors", palettome::family_colors(rv$session)))
+
+  observeEvent(input$done, stopApp(rv$session))
 
   observeEvent(input$reset, {
     rv$session <- palettome::reset_overrides(rv$session)

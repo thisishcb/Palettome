@@ -39,7 +39,11 @@ scatter plot; the full dataset is only used for the final PNG export.}
 \item{...}{Passed on to \code{shiny::runApp()} (e.g. \code{launch.browser}, \code{port}).}
 }
 \value{
-Does not return; runs the Shiny app until interrupted.
+Invisibly, the edited \code{palettome_session} once the app closes
+(via the "Done" button, or by interrupting R with Esc / Ctrl+C), so
+\code{session <- launch_palettome_ui(...)} keeps every change made in the
+UI. The app also shows the current colors as pasteable named-vector R
+code.
 }
 \description{
 This is the \emph{only} function in the package that requires UI packages
@@ -59,6 +63,7 @@ cells <- data.frame(
 )
 pdata <- as_cluster_data(cells, coord_cols = c("x", "y"), cluster_col = "cluster")
 if (interactive()) {
-  launch_palettome_ui(pdata, k = 3)
+  session <- launch_palettome_ui(pdata, k = 3)
+  cluster_colors(session)
 }
 }

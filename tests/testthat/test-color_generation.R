@@ -202,6 +202,21 @@ test_that("set_manual_color marks an entry manual and generate_palette never ove
   }
 })
 
+test_that("set_manual_color is vectorized and drops unknown ids with a warning", {
+  sess <- generate_palette(test_assignment(), mode = "harmonious", seed = 1)
+  expect_warning(
+    sess <- set_manual_color(sess, cluster = c("c1", "nope", "c2"),
+                             color = c("#111111", "#222222", "#333333")),
+    "nope"
+  )
+  expect_equal(cluster_colors(sess)[c("c1", "c2")], c(c1 = "#111111", c2 = "#333333"))
+  expect_equal(sum(sess$clusters$manual_color), 2)
+
+  expect_warning(same <- set_manual_color(sess, family = "nope", color = "#000000"), "nope")
+  expect_identical(same, sess)
+  expect_error(set_manual_color(sess, cluster = c("c1", "c2"), color = rep("#000000", 3)), "length")
+})
+
 test_that("manual override survives a family reassignment", {
   assignment <- test_assignment()
   sess <- generate_palette(assignment, mode = "harmonious", seed = 1)

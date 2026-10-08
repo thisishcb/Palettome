@@ -28,7 +28,11 @@
 #' @param preview_max_n Passed to [downsample_stratified()] for the live
 #'   scatter plot; the full dataset is only used for the final PNG export.
 #' @param ... Passed on to `shiny::runApp()` (e.g. `launch.browser`, `port`).
-#' @return Does not return; runs the Shiny app until interrupted.
+#' @return Invisibly, the edited `palettome_session` once the app closes
+#'   (via the "Done" button, or by interrupting R with Esc / Ctrl+C), so
+#'   `session <- launch_palettome_ui(...)` keeps every change made in the
+#'   UI. The app also shows the current colors as pasteable named-vector R
+#'   code.
 #' @export
 #' @examples
 #' cells <- data.frame(
@@ -38,7 +42,8 @@
 #' )
 #' pdata <- as_cluster_data(cells, coord_cols = c("x", "y"), cluster_col = "cluster")
 #' if (interactive()) {
-#'   launch_palettome_ui(pdata, k = 3)
+#'   session <- launch_palettome_ui(pdata, k = 3)
+#'   cluster_colors(session)
 #' }
 launch_palettome_ui <- function(pdata, families = NULL, session = NULL,
                                  k = NULL, h = NULL, connectivity = NULL,
@@ -99,5 +104,8 @@ launch_palettome_ui <- function(pdata, families = NULL, session = NULL,
   if (!file.exists(file.path(app_dir, "app.R"))) {
     stop("Could not locate the Shiny app directory (looked in: ", app_dir, ")", call. = FALSE)
   }
-  shiny::runApp(app_dir, ...)
+  # The app keeps .pt_env$session in sync with every edit, so an
+  # interrupt (Esc / Ctrl+C) still hands back the latest state.
+  result <- tryCatch(shiny::runApp(app_dir, ...), interrupt = function(e) NULL)
+  invisible(if (inherits(result, "palettome_session")) result else .pt_env$session)
 }

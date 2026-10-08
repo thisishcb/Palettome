@@ -117,6 +117,9 @@ To resume editing later, or hand off manual overrides:
 
 ```r
 session <- set_manual_color(session, cluster = "3", color = "#2E5A87")
+# several at once: one color each (or a single color for all); ids not in
+# the session are skipped with a warning
+session <- set_manual_color(session, cluster = c("4", "5"), color = c("#6E6E6E", "#C9A227"))
 session2 <- generate_palette(fam$assignment, session = session, mode = "contrast")
 # clusters/families with manual_color == TRUE keep their color unchanged;
 # with lightness_range/chroma_range = "auto" the rest fit to the manual picks
@@ -175,9 +178,14 @@ structure either input path produces.
 
 ```r
 install.packages(c("shiny", "plotly", "colourpicker", "shinyjs"))
-launch_palettome_ui(pdata)                    # auto-detects families
-launch_palettome_ui(pdata, session = session) # resume a saved session
+session <- launch_palettome_ui(pdata)                    # auto-detects families
+session <- launch_palettome_ui(pdata, session = session) # resume a saved session
+cluster_colors(session)                                  # your edited colors
 ```
+
+`launch_palettome_ui()` returns the edited session when the app closes --
+either via the **Done -- return session to R** button or by interrupting R
+(Esc / Ctrl+C) -- so assigning its result keeps every change made in the UI.
 
 <!-- TODO: save the UI screenshot as man/figures/readme-ui.png -->
 ![The palettome interactive UI: embedding scatter plot, family dendrogram, and drag-and-drop compartment panel](man/figures/readme-ui.png)
@@ -196,8 +204,10 @@ what you typed). When the auto light/chroma toggle is switched off, the
 Lightness- and Chroma-range sliders each get a swatch strip underneath
 rendered in the current palette's own hue, dimmed outside the selected
 sub-range -- so the numeric range reads as actual colors, not just two
-numbers. Sessions export as JSON/CSV, and the final plot exports as a
-full-resolution PNG.
+numbers. An **R code** panel shows the current cluster and family colors as
+named-vector R code (`cluster_colors <- c("3" = "#2E5A87", ...)`) with a
+copy button, ready to paste into a script. Sessions export as JSON/CSV, and
+the final plot exports as a full-resolution PNG.
 
 Click anywhere on a chip or a family's whole color bar (not just its label)
 to open the recolor dialog:

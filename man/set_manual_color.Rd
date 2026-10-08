@@ -14,7 +14,8 @@ at least one required). May be vectors to recolor several at once.}
 
 \item{color}{Hex color string(s): either a single color applied to every
 target, or one color per id (recycled separately for \code{cluster} and
-\code{family}).}
+\code{family}). Ids not present in the session are dropped, together with
+their paired colors, with a warning.}
 }
 \value{
 The updated \code{palettome_session}.

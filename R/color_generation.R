@@ -708,7 +708,8 @@ optimize_color <- function(color, session = NULL, target = c("auto", "muted", "v
 #'   at least one required). May be vectors to recolor several at once.
 #' @param color Hex color string(s): either a single color applied to every
 #'   target, or one color per id (recycled separately for `cluster` and
-#'   `family`).
+#'   `family`). Ids not present in the session are dropped, together with
+#'   their paired colors, with a warning.
 #' @return The updated `palettome_session`.
 #' @export
 #' @examples
@@ -726,27 +727,31 @@ optimize_color <- function(color, session = NULL, target = c("auto", "muted", "v
 #' cluster_colors(session)[["c1"]]
 set_manual_color <- function(session, cluster = NULL, family = NULL, color) {
   stopifnot(inherits(session, "palettome_session"), !is.null(cluster) || !is.null(family))
+  # Match ids to rows, pairing each with its color; ids absent from the
+  # session are dropped (with their colors) rather than aborting the call.
   .targets <- function(ids, pool, what) {
     ids <- as.character(ids)
     if (length(color) != 1L && length(color) != length(ids)) {
       stop("`color` must have length 1 or the same length as `", what, "` (",
            length(ids), ").", call. = FALSE)
     }
+    cols <- rep_len(color, length(ids))
     i <- match(ids, pool)
     if (anyNA(i)) {
-      stop("Unknown ", what, ": ", paste(ids[is.na(i)], collapse = ", "), call. = FALSE)
+      warning("Ignoring ", what, " id(s) not present in the session: ",
+              paste(ids[is.na(i)], collapse = ", "), call. = FALSE)
     }
-    i
+    list(i = i[!is.na(i)], color = cols[!is.na(i)])
   }
   if (!is.null(cluster)) {
-    i <- .targets(cluster, session$clusters$cluster, "cluster")
-    session$clusters$color[i] <- color
-    session$clusters$manual_color[i] <- TRUE
+    t <- .targets(cluster, session$clusters$cluster, "cluster")
+    session$clusters$color[t$i] <- t$color
+    session$clusters$manual_color[t$i] <- TRUE
   }
   if (!is.null(family)) {
-    i <- .targets(family, session$families$family_id, "family")
-    session$families$color[i] <- color
-    session$families$manual_color[i] <- TRUE
+    t <- .targets(family, session$families$family_id, "family")
+    session$families$color[t$i] <- t$color
+    session$families$manual_color[t$i] <- TRUE
   }
   session
 }

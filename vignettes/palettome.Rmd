@@ -268,7 +268,18 @@ session <- set_manual_color(session, cluster = "Plasma", color = "#2E5A87")
 session$clusters[session$clusters$manual_color, c("cluster", "color", "manual_color")]
 ```
 
-Regenerating now keeps that pick fixed and, because `lightness_range` and
+Several clusters can be set in one call, with one color each or a single
+color for all of them. Ids that are not in the session are skipped with a
+warning rather than an error, so a color map written for a related dataset
+can be reused as is:
+
+```{r manual-multi}
+multi <- set_manual_color(session, cluster = c("B_naive", "B_mem", "Not_here"),
+                          color = c("#6E6E6E", "#9A9A9A", "#000000"))
+cluster_colors(multi)[c("B_naive", "B_mem")]
+```
+
+Regenerating `session` now keeps the `Plasma` pick fixed and, because `lightness_range` and
 `chroma_range` are `"auto"`, refits the remaining colors into the
 lightness/chroma envelope your pick implies:
 
@@ -398,8 +409,14 @@ Everything above is core, and depends only on `colorspace`, `farver`,
 live HCL readout, per-cluster color picking — is one optional function:
 
 ```{r ui, eval = FALSE}
-launch_palettome_ui(pdata, session = session)
+session <- launch_palettome_ui(pdata, session = session)
 ```
+
+When the app closes -- via its **Done** button, or by interrupting R with
+Esc / Ctrl+C -- `launch_palettome_ui()` returns the edited session, so the
+assignment above keeps every change made in the UI. The app also shows the
+current cluster and family colors as named-vector R code with a copy button,
+for pasting straight into a script.
 
 It requires `shiny`, `plotly`, `colourpicker`, and `shinyjs`, all
 `Suggests`-only. If they are missing, it stops with a message naming them and
